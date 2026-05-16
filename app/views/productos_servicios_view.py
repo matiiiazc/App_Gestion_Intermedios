@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QScrollArea,
     QPushButton, QMessageBox, QLineEdit, QFormLayout, QDialog,
-    QDialogButtonBox, QDoubleSpinBox, QComboBox
+    QDialogButtonBox, QDoubleSpinBox, QComboBox, QLabel
 )
 from PySide6.QtCore import Qt
 
@@ -11,7 +11,6 @@ from app.modules.productos_servicios import ProductosServiciosModule
 class ProductoServicioDialog(QDialog):
     def __init__(self, parent=None, producto=None):
         super().__init__(parent)
-
         self.setWindowTitle("Producto / Servicio")
         self.resize(420, 330)
 
@@ -41,11 +40,9 @@ class ProductoServicioDialog(QDialog):
             self.descripcion_input.setText(producto["descripcion"] or "")
             self.precio_input.setValue(float(producto["precio"] or 0))
             self.iva_input.setValue(float(producto["iva"] or 21))
-
             index_unidad = self.unidad_input.findText(producto["unidad"] or "unidad")
             if index_unidad >= 0:
                 self.unidad_input.setCurrentIndex(index_unidad)
-
             self.stock_input.setValue(float(producto["stock"] or 0))
             self.rubro_input.setText(producto["rubro"] or "")
 
@@ -65,14 +62,22 @@ class ProductoServicioDialog(QDialog):
         layout = QVBoxLayout()
         layout.addLayout(form)
         layout.addWidget(botones)
-
-        self.setLayout(layout)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        _container = QWidget()
+        _container.setLayout(layout)
+        scroll.setWidget(_container)
+        _outer = QVBoxLayout()
+        _outer.setContentsMargins(0, 0, 0, 0)
+        _outer.setSpacing(0)
+        _outer.addWidget(scroll)
+        self.setLayout(_outer)
 
     def validar_y_aceptar(self):
         if not self.descripcion_input.text().strip():
             QMessageBox.warning(self, "Datos incompletos", "La descripcion es obligatoria.")
             return
-
         self.accept()
 
     def datos(self):
@@ -94,10 +99,14 @@ class ProductosServiciosView(QWidget):
         self.module = ProductosServiciosModule()
         self.productos_cache = []
 
+        self.buscador = QLineEdit()
+        self.buscador.setPlaceholderText("Buscar por descripcion, codigo, rubro...")
+        self.buscador.textChanged.connect(self.filtrar_tabla)
+        self.buscador.setMinimumWidth(280)
+
         self.tabla = QTableWidget()
         self.tabla.setAlternatingRowColors(True)
         self.tabla.verticalHeader().setVisible(False)
-
         self.tabla.setColumnCount(8)
         self.tabla.setHorizontalHeaderLabels([
             "ID", "Codigo", "Descripcion", "Precio", "IVA %",
@@ -116,6 +125,10 @@ class ProductosServiciosView(QWidget):
         self.btn_eliminar.clicked.connect(self.eliminar_producto)
         self.btn_actualizar.clicked.connect(self.cargar_productos)
 
+        filtro_layout = QHBoxLayout()
+        filtro_layout.addWidget(self.buscador)
+        filtro_layout.addStretch()
+
         botones_layout = QHBoxLayout()
         botones_layout.addWidget(self.btn_nuevo)
         botones_layout.addWidget(self.btn_editar)
@@ -124,6 +137,7 @@ class ProductosServiciosView(QWidget):
         botones_layout.addWidget(self.btn_actualizar)
 
         layout = QVBoxLayout()
+        layout.addLayout(filtro_layout)
         layout.addLayout(botones_layout)
         layout.addWidget(self.tabla)
 
@@ -132,88 +146,79 @@ class ProductosServiciosView(QWidget):
 
     def cargar_productos(self):
         self.productos_cache = self.module.listar()
-        self.tabla.setRowCount(len(self.productos_cache))
+        self._poblar_tabla(self.productos_cache)
+        if self.buscador.text():
+            self.filtrar_tabla(self.buscador.text())
 
-        for fila, producto in enumerate(self.productos_cache):
+    def _poblar_tabla(self, productos):
+        self.tabla.setRowCount(len(productos))
+        for fila, producto in enumerate(productos):
             valores = [
-                producto["id_producto"],
-                producto["codigo"] or "",
-                producto["descripcion"],
-                producto["precio"],
-                producto["iva"],
-                producto["unidad"],
-                producto["stock"],
-                producto["rubro"] or "",
+                producto["id_producto"], producto["codigo"] or "",
+                producto["descripcion"], producto["precio"],
+                producto["iva"], producto["unidad"],
+                producto["stock"], producto["rubro"] or "",
             ]
-
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.tabla.setItem(fila, columna, item)
-
         self.tabla.resizeColumnsToContents()
+
+    def filtrar_tabla(self, texto):
+        texto = texto.lower().strip()
+        for fila in range(self.tabla.rowCount()):
+            mostrar = False
+            if not texto:
+                mostrar = True
+            else:
+                for col in range(self.tabla.columnCount()):
+                    item = self.tabla.item(fila, col)
+                    if item and texto in item.text().lower():
+                        mostrar = True
+                        break
+            self.tabla.setRowHidden(fila, not mostrar)
 
     def producto_seleccionado(self):
         fila = self.tabla.currentRow()
-
-        if fila < 0:
+        if fila < 0 or self.tabla.isRowHidden(fila):
             QMessageBox.warning(self, "Seleccion requerida", "Selecciona un producto o servicio.")
             return None
-
-        return self.productos_cache[fila]
+        id_producto = int(self.tabla.item(fila, 0).text())
+        for p in self.productos_cache:
+            if p["id_producto"] == id_producto:
+                return p
+        return None
 
     def nuevo_producto(self):
         dialog = ProductoServicioDialog(self)
-
         if dialog.exec() == QDialog.Accepted:
             datos = dialog.datos()
-
             self.module.crear(
-                datos["codigo"],
-                datos["descripcion"],
-                datos["precio"],
-                datos["iva"],
-                datos["unidad"],
-                datos["stock"],
-                datos["rubro"]
+                datos["codigo"], datos["descripcion"], datos["precio"],
+                datos["iva"], datos["unidad"], datos["stock"], datos["rubro"]
             )
             self.cargar_productos()
 
     def editar_producto(self):
         producto = self.producto_seleccionado()
-
         if producto is None:
             return
-
         dialog = ProductoServicioDialog(self, producto=producto)
-
         if dialog.exec() == QDialog.Accepted:
             datos = dialog.datos()
-
             self.module.editar(
-                producto["id_producto"],
-                datos["codigo"],
-                datos["descripcion"],
-                datos["precio"],
-                datos["iva"],
-                datos["unidad"],
-                datos["stock"],
-                datos["rubro"]
+                producto["id_producto"], datos["codigo"], datos["descripcion"],
+                datos["precio"], datos["iva"], datos["unidad"],
+                datos["stock"], datos["rubro"]
             )
             self.cargar_productos()
 
     def eliminar_producto(self):
         producto = self.producto_seleccionado()
-
         if producto is None:
             return
-
-        respuesta = QMessageBox.question(
-            self,
-            "Eliminar producto / servicio",
-            "Seguro que queres eliminar este producto o servicio?"
-        )
-
+        respuesta = QMessageBox.question(self, "Eliminar producto / servicio", "Seguro que queres eliminar este producto o servicio?")
         if respuesta == QMessageBox.Yes:
             self.module.eliminar(producto["id_producto"])
             self.cargar_productos()

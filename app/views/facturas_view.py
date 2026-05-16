@@ -4,7 +4,7 @@ import sys
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QScrollArea,
     QPushButton, QMessageBox, QFormLayout, QDialog, QDialogButtonBox,
     QComboBox, QDoubleSpinBox, QSpinBox, QLineEdit, QDateEdit, QTextEdit,
     QLabel
@@ -19,7 +19,7 @@ class FacturaDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("Factura")
-        self.resize(720, 520)
+        self.resize(720, 620)
 
         self.clientes = clientes or []
         self.productos = productos or []
@@ -49,6 +49,7 @@ class FacturaDialog(QDialog):
         self.forma_pago_input.addItems(["Efectivo", "Transferencia", "Tarjeta", "Cuenta corriente", "Otro"])
 
         self.observaciones_input = QTextEdit()
+        self.observaciones_input.setMaximumHeight(60)
 
         self.cae_input = QLineEdit()
         self.vencimiento_cae_input = QLineEdit()
@@ -79,6 +80,7 @@ class FacturaDialog(QDialog):
 
         self.producto_combo.currentIndexChanged.connect(self.cargar_producto)
 
+        # Tabla de items — FUERA del scroll para que sea interactuable
         self.tabla_detalles = QTableWidget()
         self.tabla_detalles.setColumnCount(6)
         self.tabla_detalles.setHorizontalHeaderLabels([
@@ -86,6 +88,8 @@ class FacturaDialog(QDialog):
         ])
         self.tabla_detalles.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabla_detalles.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla_detalles.setMinimumHeight(130)
+        self.tabla_detalles.verticalHeader().setVisible(False)
 
         self.subtotal_input = QDoubleSpinBox()
         self.subtotal_input.setMaximum(999999999)
@@ -110,6 +114,7 @@ class FacturaDialog(QDialog):
         if self.productos:
             self.cargar_producto()
 
+        # ── Formulario superior (va dentro del scroll) ──────────────────
         datos_form = QFormLayout()
         datos_form.addRow("Cliente:", self.cliente_combo)
         datos_form.addRow("Tipo comprobante:", self.tipo_comprobante_input)
@@ -134,6 +139,21 @@ class FacturaDialog(QDialog):
         item_botones.addWidget(self.btn_quitar_item)
         item_botones.addStretch()
 
+        form_inner = QVBoxLayout()
+        form_inner.addLayout(datos_form)
+        form_inner.addSpacing(8)
+        form_inner.addLayout(item_form)
+        form_inner.addLayout(item_botones)
+
+        form_widget = QWidget()
+        form_widget.setLayout(form_inner)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.NoFrame)
+        scroll.setWidget(form_widget)
+
+        # ── Totales ─────────────────────────────────────────────────────
         totales_form = QFormLayout()
         totales_form.addRow("Subtotal:", self.subtotal_input)
         totales_form.addRow("IVA:", self.iva_total_input)
@@ -143,29 +163,26 @@ class FacturaDialog(QDialog):
         botones.accepted.connect(self.validar_y_aceptar)
         botones.rejected.connect(self.reject)
 
-        layout = QVBoxLayout()
-        layout.addLayout(datos_form)
-        layout.addLayout(item_form)
-        layout.addLayout(item_botones)
-        layout.addWidget(self.tabla_detalles)
-        layout.addLayout(totales_form)
-        layout.addWidget(botones)
-
-        self.setLayout(layout)
+        # ── Layout principal: scroll arriba, tabla + totales + botones abajo ──
+        outer = QVBoxLayout()
+        outer.setContentsMargins(10, 10, 10, 10)
+        outer.setSpacing(8)
+        outer.addWidget(scroll, stretch=2)
+        outer.addWidget(self.tabla_detalles, stretch=3)
+        outer.addLayout(totales_form)
+        outer.addWidget(botones)
+        self.setLayout(outer)
 
     def cargar_producto(self):
         producto = self.producto_combo.currentData()
-
         if not producto:
             return
-
         self.descripcion_input.setText(producto["descripcion"] or "")
         self.precio_unitario_input.setValue(float(producto["precio"] or 0))
         self.iva_item_input.setValue(float(producto["iva"] or 21))
 
     def agregar_item(self):
         descripcion = self.descripcion_input.text().strip()
-
         if not descripcion:
             QMessageBox.warning(self, "Datos incompletos", "La descripcion del item es obligatoria.")
             return
@@ -193,18 +210,15 @@ class FacturaDialog(QDialog):
 
     def quitar_item(self):
         fila = self.tabla_detalles.currentRow()
-
         if fila < 0:
             QMessageBox.warning(self, "Seleccion requerida", "Selecciona un item.")
             return
-
         self.detalles.pop(fila)
         self.cargar_tabla_detalles()
         self.actualizar_totales()
 
     def cargar_tabla_detalles(self):
         self.tabla_detalles.setRowCount(len(self.detalles))
-
         for fila, detalle in enumerate(self.detalles):
             valores = [
                 detalle["producto_id"] or "",
@@ -214,19 +228,16 @@ class FacturaDialog(QDialog):
                 detalle["iva"],
                 detalle["subtotal"],
             ]
-
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.tabla_detalles.setItem(fila, columna, item)
-
         self.tabla_detalles.resizeColumnsToContents()
 
     def actualizar_totales(self):
         subtotal = sum(item["subtotal"] for item in self.detalles)
         iva_total = sum(item["subtotal"] * item["iva"] / 100 for item in self.detalles)
         total = subtotal + iva_total
-
         self.subtotal_input.setValue(subtotal)
         self.iva_total_input.setValue(iva_total)
         self.total_input.setValue(total)
@@ -235,18 +246,15 @@ class FacturaDialog(QDialog):
         if self.cliente_combo.currentData() is None:
             QMessageBox.warning(self, "Datos incompletos", "Selecciona un cliente.")
             return
-
         if not self.detalles:
             QMessageBox.warning(self, "Datos incompletos", "Agrega al menos un item.")
             return
-
         self.accept()
 
     def datos_factura(self):
         numero = self.numero_input.value()
         if numero == 0:
             numero = None
-
         return {
             "tipo_comprobante": self.tipo_comprobante_input.currentText(),
             "punto_venta": self.punto_venta_input.value(),
@@ -271,13 +279,18 @@ class FacturasView(QWidget):
         self.module = FacturasModule()
         self.facturas_cache = []
 
+        self.buscador = QLineEdit()
+        self.buscador.setPlaceholderText("Buscar por cliente, tipo, numero, forma de pago...")
+        self.buscador.textChanged.connect(self.filtrar_tabla)
+        self.buscador.setMinimumWidth(300)
+
+        self.filtro_estado = QComboBox()
+        self.filtro_estado.addItems(["Todos", "Pendiente", "Preparada", "Autorizada", "Rechazada"])
+        self.filtro_estado.currentTextChanged.connect(self.cargar_facturas)
+
         self.tabla = QTableWidget()
         self.tabla.setAlternatingRowColors(True)
         self.tabla.verticalHeader().setVisible(False)
-
-        self.tabla.setAlternatingRowColors(True)
-        self.tabla.verticalHeader().setVisible(False)
-
         self.tabla.setColumnCount(11)
         self.tabla.setHorizontalHeaderLabels([
             "ID", "Cliente", "Tipo", "PV", "Numero", "Fecha",
@@ -300,6 +313,12 @@ class FacturasView(QWidget):
         self.btn_autorizar.clicked.connect(self.autorizar_en_arca)
         self.btn_pdf.clicked.connect(self.generar_pdf)
 
+        filtro_layout = QHBoxLayout()
+        filtro_layout.addWidget(QLabel("Estado:"))
+        filtro_layout.addWidget(self.filtro_estado)
+        filtro_layout.addWidget(self.buscador)
+        filtro_layout.addStretch()
+
         botones_layout = QHBoxLayout()
         botones_layout.addWidget(self.btn_nueva)
         botones_layout.addWidget(self.btn_ver_detalle)
@@ -312,6 +331,7 @@ class FacturasView(QWidget):
         self.lbl_estado = QLabel("")
 
         layout = QVBoxLayout()
+        layout.addLayout(filtro_layout)
         layout.addLayout(botones_layout)
         layout.addWidget(self.lbl_estado)
         layout.addWidget(self.tabla)
@@ -321,61 +341,74 @@ class FacturasView(QWidget):
 
     def cargar_facturas(self):
         self.facturas_cache = self.module.listar()
-        self.tabla.setRowCount(len(self.facturas_cache))
+        estado_filtro = self.filtro_estado.currentText()
 
-        for fila, factura in enumerate(self.facturas_cache):
+        if estado_filtro != "Todos":
+            filtrados = [f for f in self.facturas_cache if (f["estado_arca"] or "") == estado_filtro]
+        else:
+            filtrados = self.facturas_cache
+
+        self._poblar_tabla(filtrados)
+        if self.buscador.text():
+            self.filtrar_tabla(self.buscador.text())
+
+    def _poblar_tabla(self, facturas):
+        self.tabla.setRowCount(len(facturas))
+        for fila, factura in enumerate(facturas):
             valores = [
-                factura["id_factura"],
-                factura["cliente"],
-                factura["tipo_comprobante"],
-                factura["punto_venta"],
-                factura["numero"] or "",
-                factura["fecha"],
-                factura["subtotal"],
-                factura["iva"],
-                factura["total"],
-                factura["forma_pago"] or "",
-                factura["estado_arca"] or "",
+                factura["id_factura"], factura["cliente"],
+                factura["tipo_comprobante"], factura["punto_venta"],
+                factura["numero"] or "", factura["fecha"],
+                factura["subtotal"], factura["iva"], factura["total"],
+                factura["forma_pago"] or "", factura["estado_arca"] or "",
             ]
-
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.tabla.setItem(fila, columna, item)
-
         self.tabla.resizeColumnsToContents()
+
+    def filtrar_tabla(self, texto):
+        texto = texto.lower().strip()
+        for fila in range(self.tabla.rowCount()):
+            mostrar = False
+            if not texto:
+                mostrar = True
+            else:
+                for col in range(self.tabla.columnCount()):
+                    item = self.tabla.item(fila, col)
+                    if item and texto in item.text().lower():
+                        mostrar = True
+                        break
+            self.tabla.setRowHidden(fila, not mostrar)
 
     def factura_seleccionada(self):
         fila = self.tabla.currentRow()
-
-        if fila < 0:
+        if fila < 0 or self.tabla.isRowHidden(fila):
             QMessageBox.warning(self, "Seleccion requerida", "Selecciona una factura.")
             return None
-
-        return self.facturas_cache[fila]
+        id_factura = int(self.tabla.item(fila, 0).text())
+        for f in self.facturas_cache:
+            if f["id_factura"] == id_factura:
+                return f
+        return None
 
     def nueva_factura(self):
         clientes = self.module.listar_clientes()
         productos = self.module.listar_productos()
-
         if not clientes:
             QMessageBox.warning(self, "Sin clientes", "Primero carga un cliente.")
             return
-
         dialog = FacturaDialog(self, clientes=clientes, productos=productos)
-
         if dialog.exec() == QDialog.Accepted:
             self.module.crear(dialog.datos_factura(), dialog.detalles)
             self.cargar_facturas()
 
     def ver_detalle(self):
         factura = self.factura_seleccionada()
-
         if factura is None:
             return
-
         detalles = self.module.obtener_detalles(factura["id_factura"])
-
         texto = ""
         for detalle in detalles:
             texto += (
@@ -385,24 +418,15 @@ class FacturasView(QWidget):
                 f"IVA: {detalle['iva']}% | "
                 f"Subtotal: {detalle['subtotal']}\n"
             )
-
         if not texto:
             texto = "Esta factura no tiene detalle."
-
         QMessageBox.information(self, "Detalle factura", texto)
 
     def eliminar_factura(self):
         factura = self.factura_seleccionada()
-
         if factura is None:
             return
-
-        respuesta = QMessageBox.question(
-            self,
-            "Eliminar factura",
-            "Seguro que queres eliminar esta factura?"
-        )
-
+        respuesta = QMessageBox.question(self, "Eliminar factura", "Seguro que queres eliminar esta factura?")
         if respuesta == QMessageBox.Yes:
             self.module.eliminar(factura["id_factura"])
             self.cargar_facturas()
@@ -411,23 +435,18 @@ class FacturasView(QWidget):
         factura = self.factura_seleccionada()
         if factura is None:
             return
-
         estado = factura["estado_arca"] or ""
         if estado == "Autorizada":
             QMessageBox.information(self, "Ya autorizada", "Esta factura ya fue autorizada en ARCA.")
             return
-
         respuesta = QMessageBox.question(
-            self,
-            "Autorizar en ARCA",
-            f"¿Autorizar la factura seleccionada en ARCA?\n\nEsto enviará los datos a AFIP.",
+            self, "Autorizar en ARCA",
+            "¿Autorizar la factura seleccionada en ARCA?\n\nEsto enviará los datos a AFIP.",
         )
         if respuesta != QMessageBox.Yes:
             return
-
         self.lbl_estado.setText("⏳ Conectando con ARCA...")
         self.btn_autorizar.setEnabled(False)
-
         self._worker = _ArcaWorker(self.module, factura["id_factura"])
         self._worker.terminado.connect(self._on_arca_ok)
         self._worker.error.connect(self._on_arca_error)
@@ -438,8 +457,7 @@ class FacturasView(QWidget):
         self.lbl_estado.setText(f"✅ Autorizada — CAE: {resultado['cae']}")
         self.cargar_facturas()
         QMessageBox.information(
-            self,
-            "Factura autorizada",
+            self, "Factura autorizada",
             f"CAE: {resultado['cae']}\n"
             f"Vencimiento: {resultado['cae_vto']}\n"
             f"Número: {resultado['numero']}\n\n"
@@ -452,59 +470,43 @@ class FacturasView(QWidget):
         QMessageBox.critical(self, "Error ARCA", mensaje)
 
     def generar_pdf(self):
-        """Genera PDF de una factura ya autorizada (con CAE)."""
         factura = self.factura_seleccionada()
         if factura is None:
             return
-
         if not factura["cae"]:
-            QMessageBox.warning(
-                self,
-                "Sin CAE",
-                "Esta factura no tiene CAE. Primero autorizala en ARCA.",
-            )
+            QMessageBox.warning(self, "Sin CAE", "Esta factura no tiene CAE. Primero autorizala en ARCA.")
             return
-
         try:
             from app.db import Database
             from app.reports.factura_pdf import generar_pdf as _gen_pdf
-
             db = Database()
             detalles = db.get_factura_detalles(factura["id_factura"])
-            cliente  = db.get_cliente(factura["cliente_id"])
-            emisor   = db.get_emisor()
+            cliente = db.get_cliente(factura["cliente_id"])
+            emisor = db.get_emisor()
             db.cerrar()
-
             pdf_path = _gen_pdf(
-                factura  = factura,
-                cliente  = cliente,
-                emisor   = emisor,
-                detalles = [dict(d) for d in detalles],
+                factura=factura, cliente=cliente, emisor=emisor,
+                detalles=[dict(d) for d in detalles],
             )
-
             QMessageBox.information(self, "PDF generado", f"PDF guardado en:\n{pdf_path}")
-
-            # Abrir el PDF automáticamente según el SO
             if sys.platform.startswith("win"):
                 os.startfile(pdf_path)
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", pdf_path])
             else:
                 subprocess.Popen(["xdg-open", pdf_path])
-
         except Exception as e:
             QMessageBox.critical(self, "Error al generar PDF", str(e))
 
 
 class _ArcaWorker(QThread):
-    """Hilo para llamar a ARCA sin bloquear la UI."""
     terminado = Signal(dict)
-    error     = Signal(str)
+    error = Signal(str)
 
     def __init__(self, module, id_factura: int):
         super().__init__()
-        self.module      = module
-        self.id_factura  = id_factura
+        self.module = module
+        self.id_factura = id_factura
 
     def run(self):
         try:

@@ -310,6 +310,16 @@ QGroupBox::title {
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────── */
+/* ── ScrollArea ───────────────────────────────────────────────────────── */
+QScrollArea {
+    border: none;
+    background-color: transparent;
+}
+
+QScrollArea > QWidget > QWidget {
+    background-color: transparent;
+}
+
 QScrollBar:vertical {
     background-color: transparent;
     width: 8px;
