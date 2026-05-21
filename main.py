@@ -10,7 +10,7 @@ def main():
     app = QApplication(sys.argv)
 
     # Metadatos de la aplicación
-    app.setApplicationName("Facturación ARCA")
+    app.setApplicationName("Intermedios")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("MiEmpresa")
 
