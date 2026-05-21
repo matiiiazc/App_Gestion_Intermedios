@@ -7,9 +7,8 @@ from PySide6.QtCore import Qt
 from app.views.clientes_view import ClientesView
 from app.views.pedidos_view import PedidosView
 from app.views.presupuestos_view import PresupuestosView
-from app.views.facturas_view import FacturasView
-from app.views.productos_servicios_view import ProductosServiciosView
-from app.views.emisor_view import EmisorView
+
+
 
 
 class MainWindow(QMainWindow):
@@ -51,9 +50,6 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.crear_pagina("Clientes", ClientesView()))
         self.stack.addWidget(self.crear_pagina("Pedidos", PedidosView()))
         self.stack.addWidget(self.crear_pagina("Presupuestos", PresupuestosView()))
-        self.stack.addWidget(self.crear_pagina("Facturas", FacturasView()))
-        self.stack.addWidget(self.crear_pagina("Productos / Servicios", ProductosServiciosView()))
-        self.stack.addWidget(self.crear_pagina("Emisor", EmisorView()))
 
         content = QFrame()
         content.setObjectName("Content")
