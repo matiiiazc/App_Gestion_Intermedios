@@ -16,7 +16,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Aplicacion Intermedios")
-        self.resize(1250, 760)
+        self.showMaximized()
 
         self.menu = QListWidget()
         self.menu.addItem(QListWidgetItem("Clientes"))
