@@ -33,10 +33,10 @@ class PagosModule:
         """)
         self.db.conn.commit()
 
-    # ── Horas ────────────────────────────────────────────────────────────
+    # ==== Horas ====
 
     def get_horas_fecha(self, fecha: str) -> dict:
-        """Devuelve {empleado: horas} para una fecha dada."""
+        #Devuelve {empleado: horas} para una fecha dada
         rows = self.db.conn.execute(
             "SELECT empleado, horas FROM horas_trabajadas WHERE fecha = ?",
             (fecha,)
@@ -47,7 +47,7 @@ class PagosModule:
         return resultado
 
     def guardar_horas(self, fecha: str, horas_por_empleado: dict):
-        """Guarda o actualiza las horas de cada empleado para una fecha."""
+        #Guarda o actualiza las horas de cada empleado para una fecha
         for empleado, horas in horas_por_empleado.items():
             horas = float(horas)
             total = round(horas * TARIFA_HORA, 2)
@@ -73,7 +73,7 @@ class PagosModule:
         self.db.conn.commit()
 
     def get_dias_con_horas(self, anio: int, mes: int) -> list:
-        """Devuelve lista de fechas (YYYY-MM-DD) del mes que tienen horas cargadas."""
+        #Devuelve lista de fechas (YYYY-MM-DD) del mes que tienen horas cargadas
         patron = f"{anio:04d}-{mes:02d}-%"
         rows = self.db.conn.execute(
             "SELECT DISTINCT fecha FROM horas_trabajadas WHERE fecha LIKE ?",
@@ -81,11 +81,11 @@ class PagosModule:
         ).fetchall()
         return [r["fecha"] for r in rows]
 
-    # ── Saldos ───────────────────────────────────────────────────────────
+    # ==== Saldos y Pagos ====
 
     def get_saldo(self, empleado: str) -> dict:
-        """Devuelve total devengado, total pagado y saldo pendiente."""
-        devengado = self.db.conn.execute(
+        #Devuelve total Arrastre, total pagado y saldo pendiente
+        arrastre = self.db.conn.execute(
             "SELECT COALESCE(SUM(total), 0) AS t FROM horas_trabajadas WHERE empleado = ?",
             (empleado,)
         ).fetchone()["t"]
@@ -96,12 +96,12 @@ class PagosModule:
         ).fetchone()["t"]
 
         return {
-            "devengado": round(devengado, 2),
+            "arrastre": round(arrastre, 2),
             "pagado":    round(pagado, 2),
-            "pendiente": round(devengado - pagado, 2),
+            "pendiente": round(arrastre - pagado, 2),
         }
 
-    # ── Pagos ────────────────────────────────────────────────────────────
+     #====PAGO====
 
     def registrar_pago(self, empleado: str, monto: float, modalidad: str):
         self.db.conn.execute(

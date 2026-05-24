@@ -21,8 +21,6 @@ class MainWindow(QMainWindow):
         self.menu.addItem(QListWidgetItem("Clientes"))
         self.menu.addItem(QListWidgetItem("Pedidos"))
         self.menu.addItem(QListWidgetItem("Presupuestos"))
-        self.menu.addItem(QListWidgetItem("Productos / Servicios"))
-        self.menu.addItem(QListWidgetItem("Emisor"))
         self.menu.addItem(QListWidgetItem("Pagos"))
         self.menu.currentRowChanged.connect(self.cambiar_pagina)
 
