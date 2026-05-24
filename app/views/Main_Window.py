@@ -7,31 +7,33 @@ from PySide6.QtCore import Qt
 from app.views.clientes_view import ClientesView
 from app.views.pedidos_view import PedidosView
 from app.views.presupuestos_view import PresupuestosView
-
-
+from app.views.pagos_view import PagosView
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Aplicacion Intermedios")
+        self.setWindowTitle("Intermedios")
         self.showMaximized()
 
         self.menu = QListWidget()
         self.menu.addItem(QListWidgetItem("Clientes"))
         self.menu.addItem(QListWidgetItem("Pedidos"))
         self.menu.addItem(QListWidgetItem("Presupuestos"))
+        self.menu.addItem(QListWidgetItem("Productos / Servicios"))
+        self.menu.addItem(QListWidgetItem("Emisor"))
+        self.menu.addItem(QListWidgetItem("Pagos"))
         self.menu.currentRowChanged.connect(self.cambiar_pagina)
 
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(245)
+        sidebar.setFixedWidth(200)
 
         titulo = QLabel("Intermedios")
         titulo.setObjectName("AppTitle")
 
-        subtitulo = QLabel("Gestion comercial")
+        subtitulo = QLabel("Gestión comercial")
         subtitulo.setObjectName("AppSubtitle")
 
         sidebar_layout = QVBoxLayout()
@@ -44,13 +46,13 @@ class MainWindow(QMainWindow):
         sidebar.setLayout(sidebar_layout)
 
         self.stack = QStackedWidget()
-        self.stack.addWidget(self.crear_pagina("Clientes", ClientesView()))
-        self.stack.addWidget(self.crear_pagina("Pedidos", PedidosView()))
-        self.stack.addWidget(self.crear_pagina("Presupuestos", PresupuestosView()))
+        self.stack.addWidget(self.crear_pagina("Clientes",              ClientesView()))
+        self.stack.addWidget(self.crear_pagina("Pedidos",               PedidosView()))
+        self.stack.addWidget(self.crear_pagina("Presupuestos",          PresupuestosView()))
+        self.stack.addWidget(self.crear_pagina("Pagos",                 PagosView()))
 
         content = QFrame()
         content.setObjectName("Content")
-
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(24, 22, 24, 24)
         content_layout.addWidget(self.stack)
@@ -69,16 +71,13 @@ class MainWindow(QMainWindow):
 
     def crear_pagina(self, titulo, widget):
         pagina = QWidget()
-
-        label = QLabel(titulo)
+        label  = QLabel(titulo)
         label.setObjectName("PageTitle")
-
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
         layout.addWidget(label)
         layout.addWidget(widget)
-
         pagina.setLayout(layout)
         return pagina
 
