@@ -11,8 +11,6 @@ def main():
 
     # Metadatos de la aplicación
     app.setApplicationName("Intermedios")
-    app.setApplicationVersion("1.0.0")
-    app.setOrganizationName("MiEmpresa")
 
     app.setStyleSheet(APP_STYLE)
 

@@ -405,3 +405,71 @@ class Database:
                 )
             )
         self.conn.commit()
+
+    # ==== GASTOS ====
+
+    def get_gastos(self):
+        return self.conn.execute(
+            "SELECT * FROM gastos ORDER BY fecha DESC, id_gasto DESC"
+        ).fetchall()
+
+    def get_gasto(self, id_gasto):
+        return self.conn.execute(
+            "SELECT * FROM gastos WHERE id_gasto = ?",
+            (id_gasto,)
+        ).fetchone()
+
+    def get_gastos_por_proveedor(self, proveedor: str):
+        return self.conn.execute(
+            """SELECT * FROM gastos
+               WHERE proveedor = ?
+               ORDER BY fecha DESC, id_gasto DESC""",
+            (proveedor,)
+        ).fetchall()
+
+    def get_proveedores_gastos(self) -> list:
+        rows = self.conn.execute(
+            """SELECT DISTINCT proveedor FROM gastos
+               WHERE proveedor != ''
+               ORDER BY proveedor"""
+        ).fetchall()
+        return [r["proveedor"] for r in rows]
+
+    def get_totales_gastos_por_proveedor(self) -> list:
+        rows = self.conn.execute(
+            """SELECT COALESCE(NULLIF(proveedor,''), '(Sin proveedor)') AS proveedor,
+                      SUM(costo) AS total
+               FROM gastos
+               GROUP BY proveedor
+               ORDER BY proveedor"""
+        ).fetchall()
+        return [(r["proveedor"], r["total"]) for r in rows]
+
+    def insertar_gasto(self, producto, proveedor, costo, fecha=None):
+        if fecha:
+            self.conn.execute(
+                "INSERT INTO gastos (producto, proveedor, costo, fecha) VALUES (?, ?, ?, ?)",
+                (producto, proveedor, costo, fecha)
+            )
+        else:
+            self.conn.execute(
+                "INSERT INTO gastos (producto, proveedor, costo) VALUES (?, ?, ?)",
+                (producto, proveedor, costo)
+            )
+        self.conn.commit()
+
+    def actualizar_gasto(self, id_gasto, producto, proveedor, costo, fecha):
+        self.conn.execute(
+            """UPDATE gastos
+               SET producto  = ?,
+                   proveedor = ?,
+                   costo     = ?,
+                   fecha     = ?
+               WHERE id_gasto = ?""",
+            (producto, proveedor, costo, fecha, id_gasto)
+        )
+        self.conn.commit()
+
+    def eliminar_gasto(self, id_gasto):
+        self.conn.execute("DELETE FROM gastos WHERE id_gasto = ?", (id_gasto,))
+        self.conn.commit()
