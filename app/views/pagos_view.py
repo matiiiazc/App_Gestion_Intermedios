@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QDialog, QFormLayout, QDoubleSpinBox, QComboBox,
     QDialogButtonBox, QGroupBox, QTableWidget, QTableWidgetItem,
-    QGridLayout, QFrame, QMessageBox
+    QGridLayout, QFrame, QMessageBox, QDateEdit
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
@@ -44,7 +44,12 @@ class HorasDialog(QDialog):
         for spin in self.spins.values():
             spin.valueChanged.connect(self._actualizar_subtotales)
 
-        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
 
@@ -70,7 +75,7 @@ class HorasDialog(QDialog):
         return {emp: spin.value() for emp, spin in self.spins.items()}
 
 
-# ── Dialog: Registrar pago ────────────────────────────────────────────────────
+# ── Dialog: Registrar pago empleado ──────────────────────────────────────────
 
 class PagoDialog(QDialog):
     def __init__(self, parent, saldos: dict):
@@ -94,15 +99,26 @@ class PagoDialog(QDialog):
         self.combo_modal = QComboBox()
         self.combo_modal.addItems(["Efectivo", "Transferencia"])
 
+        self.fecha_input = QDateEdit()
+        self.fecha_input.setCalendarPopup(True)
+        self.fecha_input.setDate(QDate.currentDate())
+        self.fecha_input.setDisplayFormat("dd/MM/yyyy")
+
         self._actualizar_pendiente(EMPLEADOS[0])
 
         form = QFormLayout()
-        form.addRow("Empleado:",       self.combo_emp)
-        form.addRow("Pendiente:",      self.lbl_pendiente)
-        form.addRow("Monto a pagar:",  self.spin_monto)
-        form.addRow("Modalidad:",      self.combo_modal)
+        form.addRow("Empleado:",      self.combo_emp)
+        form.addRow("Pendiente:",     self.lbl_pendiente)
+        form.addRow("Monto a pagar:", self.spin_monto)
+        form.addRow("Modalidad:",     self.combo_modal)
+        form.addRow("Fecha:",         self.fecha_input)
 
-        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
         botones.accepted.connect(self._validar)
         botones.rejected.connect(self.reject)
 
@@ -126,12 +142,12 @@ class PagoDialog(QDialog):
             "empleado":  self.combo_emp.currentText(),
             "monto":     self.spin_monto.value(),
             "modalidad": self.combo_modal.currentText(),
+            "fecha":     self.fecha_input.date().toString("yyyy-MM-dd"),
         }
 
 
 # ── Calendario ────────────────────────────────────────────────────────────────
 
-# Estilo base para cada celda día — anula el QPushButton global
 _BTN_BASE = """
     QPushButton {{
         background-color: {bg};
@@ -177,9 +193,9 @@ def _estilo_dia(es_hoy, tiene_horas, es_finde):
 class CalendarioWidget(QWidget):
     def __init__(self, parent_view):
         super().__init__()
-        self.parent_view  = parent_view
-        self.hoy          = QDate.currentDate()
-        self.mes_actual   = QDate(self.hoy.year(), self.hoy.month(), 1)
+        self.parent_view = parent_view
+        self.hoy         = QDate.currentDate()
+        self.mes_actual  = QDate(self.hoy.year(), self.hoy.month(), 1)
         self.dias_con_horas: set = set()
         self._setup_ui()
         self._renderizar()
@@ -189,7 +205,6 @@ class CalendarioWidget(QWidget):
         self.layout_main.setContentsMargins(4, 4, 4, 4)
         self.layout_main.setSpacing(8)
 
-        # Navegación
         nav = QHBoxLayout()
         nav.setSpacing(4)
 
@@ -214,8 +229,8 @@ class CalendarioWidget(QWidget):
             """)
 
         self.lbl_mes = QLabel()
-        self.lbl_mes.setAlignment(Qt.AlignCenter)
-        font = QFont("Segoe UI", 12, QFont.Bold)
+        self.lbl_mes.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        font = QFont("Segoe UI", 12, QFont.Weight.Bold)
         self.lbl_mes.setFont(font)
         self.lbl_mes.setStyleSheet("color: #ffffff;")
 
@@ -227,7 +242,6 @@ class CalendarioWidget(QWidget):
         nav.addWidget(self.btn_next)
         self.layout_main.addLayout(nav)
 
-        # Grid
         self.grid = QGridLayout()
         self.grid.setSpacing(2)
         self.grid.setContentsMargins(0, 0, 0, 0)
@@ -238,11 +252,11 @@ class CalendarioWidget(QWidget):
         self._renderizar()
 
     def _renderizar(self):
-        # Limpiar
         while self.grid.count():
             item = self.grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget() if item else None
+            if w:
+                w.deleteLater()
 
         self.lbl_mes.setText(
             self.mes_actual.toString("MMMM yyyy").capitalize()
@@ -254,11 +268,10 @@ class CalendarioWidget(QWidget):
             )
         )
 
-        # Cabecera
         dias_sem = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"]
         for col, d in enumerate(dias_sem):
             lbl = QLabel(d)
-            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setFixedHeight(24)
             lbl.setStyleSheet(
                 "color: #6366f1; font-weight: 700; font-size: 11px;"
@@ -275,15 +288,15 @@ class CalendarioWidget(QWidget):
             fecha     = QDate(self.mes_actual.year(), self.mes_actual.month(), dia)
             fecha_str = fecha.toString("yyyy-MM-dd")
 
-            es_hoy       = fecha == self.hoy
-            tiene_horas  = fecha_str in self.dias_con_horas
-            es_finde     = fecha.dayOfWeek() >= 6
+            es_hoy      = fecha == self.hoy
+            tiene_horas = fecha_str in self.dias_con_horas
+            es_finde    = fecha.dayOfWeek() >= 6
 
             btn = QPushButton(str(dia))
             btn.setStyleSheet(_estilo_dia(es_hoy, tiene_horas, es_finde))
-            btn.setCursor(Qt.PointingHandCursor)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _, f=fecha_str: self._click_dia(f))
-            self.grid.addWidget(btn, fila, col, Qt.AlignCenter)
+            self.grid.addWidget(btn, fila, col, Qt.AlignmentFlag.AlignCenter)
 
             col += 1
             if col > 6:
@@ -310,7 +323,7 @@ class PagosView(QWidget):
         root = QHBoxLayout(self)
         root.setSpacing(20)
 
-        # ── Izquierda: Calendario ──────────────────────────────────────────
+        # ── Izquierda: Calendario ─────────────────────────────────────────
         left = QVBoxLayout()
         left.setSpacing(12)
 
@@ -327,11 +340,10 @@ class PagosView(QWidget):
         left.addWidget(cal_box)
         left.addStretch()
 
-        # ── Derecha: Saldos + Historial ────────────────────────────────────
+        # ── Derecha: Saldos + Historial ───────────────────────────────────
         right = QVBoxLayout()
         right.setSpacing(12)
 
-        # Saldos
         saldos_box = QGroupBox("Saldos")
         saldos_layout = QVBoxLayout(saldos_box)
         saldos_layout.setSpacing(8)
@@ -345,27 +357,29 @@ class PagosView(QWidget):
             fl = QGridLayout(frame)
             fl.setContentsMargins(12, 10, 12, 10)
 
-            lbl_nombre    = QLabel(emp)
+            lbl_nombre = QLabel(emp)
             lbl_nombre.setStyleSheet(
                 "font-size: 14px; font-weight: 700; color: #e2e8f0; background: transparent;"
             )
-            lbl_Arrastre = QLabel("Arrastre: —")
-            lbl_Arrastre.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
-            lbl_pagado    = QLabel("Pagado: —")
+            lbl_arrastre = QLabel("Arrastre: —")
+            lbl_arrastre.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
+            lbl_pagado = QLabel("Pagado: —")
             lbl_pagado.setStyleSheet("color: #94a3b8; font-size: 11px; background: transparent;")
             lbl_pendiente = QLabel("—")
             lbl_pendiente.setStyleSheet(
                 "font-size: 18px; font-weight: 700; color: #f87171; background: transparent;"
             )
-            lbl_pendiente.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            lbl_pendiente.setAlignment(
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+            )
 
             fl.addWidget(lbl_nombre,    0, 0)
             fl.addWidget(lbl_pendiente, 0, 1, 2, 1)
-            fl.addWidget(lbl_Arrastre, 1, 0)
+            fl.addWidget(lbl_arrastre,  1, 0)
             fl.addWidget(lbl_pagado,    2, 0)
 
             self.saldo_widgets[emp] = {
-                "arrastre": lbl_Arrastre,
+                "arrastre":  lbl_arrastre,
                 "pagado":    lbl_pagado,
                 "pendiente": lbl_pendiente,
             }
@@ -387,7 +401,7 @@ class PagosView(QWidget):
         self.tabla_hist = QTableWidget(0, 4)
         self.tabla_hist.setHorizontalHeaderLabels(["Fecha", "Horas", "Total", "Tipo"])
         self.tabla_hist.verticalHeader().setVisible(False)
-        self.tabla_hist.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla_hist.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla_hist.setAlternatingRowColors(True)
         self.tabla_hist.horizontalHeader().setStretchLastSection(True)
 
@@ -410,7 +424,7 @@ class PagosView(QWidget):
     def abrir_form_horas(self, fecha_str: str):
         horas_actuales = self.module.get_horas_fecha(fecha_str)
         dialog = HorasDialog(self, fecha_str, horas_actuales)
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.module.guardar_horas(fecha_str, dialog.datos())
             self.calendario.refrescar()
             self._actualizar_saldos()
@@ -419,9 +433,9 @@ class PagosView(QWidget):
     def _registrar_pago(self):
         saldos = {emp: self.module.get_saldo(emp) for emp in EMPLEADOS}
         dialog = PagoDialog(self, saldos)
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             d = dialog.datos()
-            self.module.registrar_pago(d["empleado"], d["monto"], d["modalidad"])
+            self.module.registrar_pago(d["empleado"], d["monto"], d["modalidad"], d["fecha"])
             self._actualizar_saldos()
             self._cargar_historial(self.combo_hist_emp.currentText())
             QMessageBox.information(
@@ -451,6 +465,7 @@ class PagosView(QWidget):
             self.tabla_hist.setItem(fila, 2, QTableWidgetItem(_fmt(h["total"])))
             self.tabla_hist.setItem(fila, 3, QTableWidgetItem("Horas"))
             for col in range(4):
-                if self.tabla_hist.item(fila, col):
-                    self.tabla_hist.item(fila, col).setTextAlignment(Qt.AlignCenter)
+                item = self.tabla_hist.item(fila, col)
+                if item:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.tabla_hist.resizeColumnsToContents()

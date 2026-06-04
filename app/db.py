@@ -1,6 +1,18 @@
 import sqlite3
 from pathlib import Path
+import sys
+from pathlib import Path
 
+
+
+
+
+def get_base_path():
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+
+    return Path(__file__).resolve().parent.parent
 
 class Database:
     def __init__(self, nombre_db="intermedios.db"):
@@ -8,6 +20,8 @@ class Database:
         self.conn = sqlite3.connect(ruta)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+    
+
 
     def cerrar(self):
         self.conn.close()
@@ -307,105 +321,7 @@ class Database:
         self.conn.commit()
         return True
 
-    # ====PRODUCTOS SERVICIOS====
-
-    def get_productos_servicios(self):
-        return self.conn.execute("""
-            SELECT * FROM productos_servicios
-            ORDER BY rubro, descripcion
-        """).fetchall()
-
-    def get_producto_servicio(self, id_producto):
-        return self.conn.execute(
-            "SELECT * FROM productos_servicios WHERE id_producto = ?",
-            (id_producto,)
-        ).fetchone()
-
-    def insertar_producto_servicio(self, codigo, descripcion, precio,
-                                   iva=21, unidad="unidad", stock=0, rubro=""):
-        self.conn.execute(
-            """INSERT INTO productos_servicios
-               (codigo, descripcion, precio, iva, unidad, stock, rubro)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (codigo, descripcion, precio, iva, unidad, stock, rubro)
-        )
-        self.conn.commit()
-
-    def actualizar_producto_servicio(self, id_producto, codigo, descripcion,
-                                     precio, iva=21, unidad="unidad",
-                                     stock=0, rubro=""):
-        self.conn.execute(
-            """UPDATE productos_servicios
-               SET codigo      = ?,
-                   descripcion = ?,
-                   precio      = ?,
-                   iva         = ?,
-                   unidad      = ?,
-                   stock       = ?,
-                   rubro       = ?
-               WHERE id_producto = ?""",
-            (codigo, descripcion, precio, iva, unidad, stock, rubro, id_producto)
-        )
-        self.conn.commit()
-
-    def eliminar_producto_servicio(self, id_producto):
-        self.conn.execute(
-            "DELETE FROM productos_servicios WHERE id_producto = ?",
-            (id_producto,)
-        )
-        self.conn.commit()
-
-    # ====EMISOR====
-
-    def get_emisor(self):
-        return self.conn.execute(
-            "SELECT * FROM emisor ORDER BY id_emisor LIMIT 1"
-        ).fetchone()
-
-    def guardar_emisor(self, datos):
-        emisor = self.get_emisor()
-        if emisor:
-            self.conn.execute(
-                """UPDATE emisor
-                   SET razon_social       = ?,
-                       nombre_fantasia    = ?,
-                       cuit               = ?,
-                       condicion_iva      = ?,
-                       domicilio          = ?,
-                       inicio_actividades = ?,
-                       punto_venta        = ?,
-                       ingresos_brutos    = ?,
-                       certificado_mipyme = ?,
-                       email              = ?,
-                       telefono           = ?
-                   WHERE id_emisor = ?""",
-                (
-                    datos["razon_social"], datos["nombre_fantasia"],
-                    datos["cuit"], datos["condicion_iva"],
-                    datos["domicilio"], datos["inicio_actividades"],
-                    datos["punto_venta"], datos["ingresos_brutos"],
-                    datos["certificado_mipyme"], datos["email"],
-                    datos["telefono"], emisor["id_emisor"]
-                )
-            )
-        else:
-            self.conn.execute(
-                """INSERT INTO emisor
-                   (razon_social, nombre_fantasia, cuit, condicion_iva,
-                    domicilio, inicio_actividades, punto_venta,
-                    ingresos_brutos, certificado_mipyme, email, telefono)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    datos["razon_social"], datos["nombre_fantasia"],
-                    datos["cuit"], datos["condicion_iva"],
-                    datos["domicilio"], datos["inicio_actividades"],
-                    datos["punto_venta"], datos["ingresos_brutos"],
-                    datos["certificado_mipyme"], datos["email"],
-                    datos["telefono"]
-                )
-            )
-        self.conn.commit()
-
+    
     # ==== GASTOS ====
 
     def get_gastos(self):
@@ -445,31 +361,134 @@ class Database:
         ).fetchall()
         return [(r["proveedor"], r["total"]) for r in rows]
 
-    def insertar_gasto(self, producto, proveedor, costo, fecha=None):
+    def insertar_gasto(self, producto, proveedor, descripcion, categoria, costo, fecha=None):
         if fecha:
             self.conn.execute(
-                "INSERT INTO gastos (producto, proveedor, costo, fecha) VALUES (?, ?, ?, ?)",
-                (producto, proveedor, costo, fecha)
+                """INSERT INTO gastos (producto, proveedor, descripcion, categoria, costo, fecha)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (producto, proveedor, descripcion, categoria, costo, fecha)
             )
         else:
             self.conn.execute(
-                "INSERT INTO gastos (producto, proveedor, costo) VALUES (?, ?, ?)",
-                (producto, proveedor, costo)
+                """INSERT INTO gastos (producto, proveedor, descripcion, categoria, costo)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (producto, proveedor, descripcion, categoria, costo)
             )
         self.conn.commit()
 
-    def actualizar_gasto(self, id_gasto, producto, proveedor, costo, fecha):
+    def actualizar_gasto(self, id_gasto, producto, proveedor, descripcion, categoria, costo, fecha):
         self.conn.execute(
             """UPDATE gastos
-               SET producto  = ?,
-                   proveedor = ?,
-                   costo     = ?,
-                   fecha     = ?
+               SET producto    = ?,
+                   proveedor   = ?,
+                   descripcion = ?,
+                   categoria   = ?,
+                   costo       = ?,
+                   fecha       = ?
                WHERE id_gasto = ?""",
-            (producto, proveedor, costo, fecha, id_gasto)
+            (producto, proveedor, descripcion, categoria, costo, fecha, id_gasto)
         )
         self.conn.commit()
 
     def eliminar_gasto(self, id_gasto):
         self.conn.execute("DELETE FROM gastos WHERE id_gasto = ?", (id_gasto,))
         self.conn.commit()
+    # ==== GANANCIAS ====
+
+    def get_pedidos_por_periodo(self, fecha_desde: str, fecha_hasta: str):
+        return self.conn.execute(
+            """SELECT
+                   p.*,
+                   CASE
+                       WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
+                       ELSE c.nombre || ' ' || c.apellido
+                   END AS cliente
+               FROM pedidos p
+               JOIN clientes c ON p.id_cliente = c.id_cliente
+               WHERE p.fecha BETWEEN ? AND ?
+               ORDER BY p.fecha DESC""",
+            (fecha_desde, fecha_hasta)
+        ).fetchall()
+
+    def get_gastos_por_periodo(self, fecha_desde: str, fecha_hasta: str):
+        return self.conn.execute(
+            """SELECT * FROM gastos
+               WHERE fecha BETWEEN ? AND ?
+               ORDER BY fecha DESC""",
+            (fecha_desde, fecha_hasta)
+        ).fetchall()
+
+    def get_top_proveedores(self, limite: int = 3):
+        return self.conn.execute(
+            """SELECT COALESCE(NULLIF(proveedor,''), '(Sin proveedor)') AS proveedor,
+                      SUM(costo) AS total
+               FROM gastos
+               GROUP BY proveedor
+               ORDER BY total DESC
+               LIMIT ?""",
+            (limite,)
+        ).fetchall()
+
+    def get_top_productos_vendidos(self, limite: int = 3):
+        return self.conn.execute(
+            """SELECT tipo_trabajo AS producto,
+                      COUNT(*) AS cantidad,
+                      SUM(precio_final) AS total
+               FROM pedidos
+               GROUP BY tipo_trabajo
+               ORDER BY cantidad DESC
+               LIMIT ?""",
+            (limite,)
+        ).fetchall()
+
+
+        
+    # ==== PAGOS ====
+
+    def get_pagos_cliente(self, id_cliente):
+        return self.conn.execute(
+            """SELECT * FROM pagos
+            WHERE id_cliente = ?
+            ORDER BY fecha DESC, id_pago DESC""",
+            (id_cliente,)
+        ).fetchall()
+
+    def insertar_pago(self, id_cliente, monto, fecha, descripcion=""):
+        self.conn.execute(
+            """INSERT INTO pagos (id_cliente, monto, fecha, descripcion)
+            VALUES (?, ?, ?, ?)""",
+            (id_cliente, monto, fecha, descripcion)
+        )
+        self.conn.commit()
+
+    def eliminar_pago(self, id_pago):
+        self.conn.execute("DELETE FROM pagos WHERE id_pago = ?", (id_pago,))
+        self.conn.commit()
+
+    def get_resumen_financiero_cliente(self, id_cliente):
+        """Devuelve total_facturado, total_senas, total_pagos_extra, saldo."""
+        total_facturado = self.conn.execute(
+            "SELECT COALESCE(SUM(precio_final), 0) FROM pedidos WHERE id_cliente = ?",
+            (id_cliente,)
+        ).fetchone()[0]
+
+        total_senas = self.conn.execute(
+            "SELECT COALESCE(SUM(sena), 0) FROM pedidos WHERE id_cliente = ?",
+            (id_cliente,)
+        ).fetchone()[0]
+
+        total_pagos_extra = self.conn.execute(
+            "SELECT COALESCE(SUM(monto), 0) FROM pagos WHERE id_cliente = ?",
+            (id_cliente,)
+        ).fetchone()[0]
+
+        total_pagado = total_senas + total_pagos_extra
+        saldo = total_facturado - total_pagado
+
+        return {
+            "total_facturado":   total_facturado,
+            "total_senas":       total_senas,
+            "total_pagos_extra": total_pagos_extra,
+            "total_pagado":      total_pagado,
+            "saldo":             saldo,
+        }

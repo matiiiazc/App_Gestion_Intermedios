@@ -9,6 +9,7 @@ from app.views.pedidos_view import PedidosView
 from app.views.presupuestos_view import PresupuestosView
 from app.views.pagos_view import PagosView
 from app.views.gastos_view import GastosView
+from app.views.ganancias_view import GananciasView
 
 
 class MainWindow(QMainWindow):
@@ -24,6 +25,8 @@ class MainWindow(QMainWindow):
         self.menu.addItem(QListWidgetItem("Presupuestos"))
         self.menu.addItem(QListWidgetItem("Pagos"))
         self.menu.addItem(QListWidgetItem("Gastos"))
+        self.menu.addItem(QListWidgetItem("Ganancias"))
+        
         self.menu.currentRowChanged.connect(self.cambiar_pagina)
 
         sidebar = QFrame()
@@ -51,7 +54,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.crear_pagina("Presupuestos",          PresupuestosView()))
         self.stack.addWidget(self.crear_pagina("Pagos",                 PagosView()))
         self.stack.addWidget(self.crear_pagina("Gastos",                GastosView()))
-
+        self.stack.addWidget(self.crear_pagina("Ganancias", GananciasView()))
+        
         content = QFrame()
         content.setObjectName("Content")
         content_layout = QVBoxLayout()
