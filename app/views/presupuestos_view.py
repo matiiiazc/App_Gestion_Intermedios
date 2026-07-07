@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QScrollArea,
     QPushButton, QMessageBox, QLineEdit, QFormLayout, QDialog,
-    QDialogButtonBox, QComboBox, QDoubleSpinBox, QDateEdit, QLabel
+    QDialogButtonBox, QComboBox, QDoubleSpinBox, QDateEdit, QLabel, QTextEdit
 )
 from PySide6.QtCore import Qt, QDate
 
@@ -12,7 +12,7 @@ class PresupuestoDialog(QDialog):
     def __init__(self, parent=None, clientes=None, presupuesto=None):
         super().__init__(parent)
         self.setWindowTitle("Presupuesto")
-        self.resize(430, 320)
+        self.resize(430, 400)
         self.presupuesto = presupuesto
 
         self.cliente_combo = QComboBox()
@@ -21,6 +21,7 @@ class PresupuestoDialog(QDialog):
             self.cliente_combo.addItem(cliente["cliente"], cliente["id_cliente"])
 
         self.tipo_trabajo_input = QLineEdit()
+        self.descripcion_input = QTextEdit()
 
         self.fecha_ingreso_input = QDateEdit()
         self.fecha_ingreso_input.setCalendarPopup(True)
@@ -43,6 +44,7 @@ class PresupuestoDialog(QDialog):
             if index_cliente >= 0:
                 self.cliente_combo.setCurrentIndex(index_cliente)
             self.tipo_trabajo_input.setText(presupuesto["tipo_trabajo"] or "")
+            self.descripcion_input.setPlainText(presupuesto["descripcion"] or "")
             self.total_input.setValue(float(presupuesto["total"] or 0))
             self.set_fecha(self.fecha_ingreso_input, presupuesto["fecha_ingreso"])
             self.set_fecha(self.fecha_inicio_input, presupuesto["fecha_inicio"])
@@ -51,6 +53,7 @@ class PresupuestoDialog(QDialog):
         form = QFormLayout()
         form.addRow("Cliente:", self.cliente_combo)
         form.addRow("Tipo trabajo:", self.tipo_trabajo_input)
+        form.addRow("Descripcion:", self.descripcion_input)
         form.addRow("Fecha ingreso:", self.fecha_ingreso_input)
         form.addRow("Fecha inicio:", self.fecha_inicio_input)
         form.addRow("Fecha expiracion:", self.fecha_expiracion_input)
@@ -90,6 +93,7 @@ class PresupuestoDialog(QDialog):
         return {
             "id_cliente": self.cliente_combo.currentData(),
             "tipo_trabajo": self.tipo_trabajo_input.text().strip(),
+            "descripcion": self.descripcion_input.toPlainText().strip(),
             "fecha_ingreso": self.fecha_ingreso_input.date().toString("yyyy-MM-dd"),
             "fecha_inicio": self.fecha_inicio_input.date().toString("yyyy-MM-dd"),
             "fecha_expiracion": self.fecha_expiracion_input.date().toString("yyyy-MM-dd"),
@@ -116,9 +120,9 @@ class PresupuestosView(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setAlternatingRowColors(True)
         self.tabla.verticalHeader().setVisible(False)
-        self.tabla.setColumnCount(8)
+        self.tabla.setColumnCount(9)
         self.tabla.setHorizontalHeaderLabels([
-            "ID", "Cliente", "Tipo", "Fecha ingreso",
+            "ID", "Cliente", "Tipo", "Descripcion", "Fecha ingreso",
             "Fecha inicio", "Fecha expiracion", "Total", "Estado"
         ])
         self.tabla.setSelectionBehavior(QTableWidget.SelectRows)
@@ -175,7 +179,7 @@ class PresupuestosView(QWidget):
         self.tabla.setRowCount(len(presupuestos))
         for fila, p in enumerate(presupuestos):
             valores = [
-                p["id_presupuesto"], p["cliente"], p["tipo_trabajo"],
+                p["id_presupuesto"], p["cliente"], p["tipo_trabajo"], p["descripcion"] or "",
                 p["fecha_ingreso"], p["fecha_inicio"] or "",
                 p["fecha_expiracion"] or "", p["total"],
                 p["estado"] if "estado" in p.keys() else "Pendiente",
@@ -220,8 +224,9 @@ class PresupuestosView(QWidget):
         if dialog.exec() == QDialog.Accepted:
             datos = dialog.datos()
             self.module.crear(
-                datos["id_cliente"], datos["tipo_trabajo"], datos["fecha_ingreso"],
-                datos["fecha_inicio"], datos["fecha_expiracion"], datos["total"]
+                datos["id_cliente"], datos["tipo_trabajo"], datos["descripcion"],
+                datos["fecha_ingreso"], datos["fecha_inicio"],
+                datos["fecha_expiracion"], datos["total"]
             )
             self.cargar_presupuestos()
 
@@ -242,7 +247,7 @@ class PresupuestosView(QWidget):
                     return
             self.module.editar(
                 presupuesto["id_presupuesto"], datos["id_cliente"], datos["tipo_trabajo"],
-                datos["fecha_ingreso"], datos["fecha_inicio"],
+                datos["descripcion"], datos["fecha_ingreso"], datos["fecha_inicio"],
                 datos["fecha_expiracion"], datos["total"]
             )
             self.cargar_presupuestos()

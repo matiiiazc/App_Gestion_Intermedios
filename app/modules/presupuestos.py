@@ -11,23 +11,25 @@ class PresupuestosModule:
     def listar_clientes(self):
         return self.db.get_clientes()
 
-    def crear(self, id_cliente, tipo_trabajo, fecha_ingreso,
+    def crear(self, id_cliente, tipo_trabajo, descripcion, fecha_ingreso,
               fecha_inicio, fecha_expiracion, total):
         self.db.insertar_presupuesto(
             id_cliente,
             tipo_trabajo,
+            descripcion,
             fecha_ingreso,
             fecha_inicio,
             fecha_expiracion,
             total
         )
 
-    def editar(self, id_presupuesto, id_cliente, tipo_trabajo,
+    def editar(self, id_presupuesto, id_cliente, tipo_trabajo, descripcion,
                fecha_ingreso, fecha_inicio, fecha_expiracion, total):
         self.db.actualizar_presupuesto(
             id_presupuesto,
             id_cliente,
             tipo_trabajo,
+            descripcion,
             fecha_ingreso,
             fecha_inicio,
             fecha_expiracion,

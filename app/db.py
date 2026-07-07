@@ -6,7 +6,6 @@ from pathlib import Path
 
 
 
-
 def get_base_path():
 
     if getattr(sys, "frozen", False):
@@ -20,7 +19,7 @@ class Database:
         self.conn = sqlite3.connect(ruta)
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
-    
+
 
 
     def cerrar(self):
@@ -134,6 +133,7 @@ class Database:
         return self.conn.execute("""
             SELECT
                 p.*,
+                (p.sena - p.precio_final) AS saldo,
                 CASE
                     WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
                     ELSE c.nombre || ' ' || c.apellido
@@ -145,14 +145,14 @@ class Database:
 
     def insertar_pedido(self, id_cliente, tipo_trabajo, descripcion,
                         precio_costo, precio_final, sena,
-                        fecha, estado="Pendiente"):
+                        fecha, fecha_ingreso, estado="Pendiente"):
         self.conn.execute(
             """INSERT INTO pedidos
                (id_cliente, tipo_trabajo, descripcion, precio_costo,
-                precio_final, sena, fecha, estado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                precio_final, sena, fecha, fecha_ingreso, estado)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (id_cliente, tipo_trabajo, descripcion,
-             precio_costo, precio_final, sena, fecha, estado)
+             precio_costo, precio_final, sena, fecha, fecha_ingreso, estado)
         )
         self.conn.execute(
             """UPDATE clientes
@@ -162,13 +162,13 @@ class Database:
         )
         self.conn.commit()
 
-    def insertar_pedidos_varios(self, id_cliente, fecha, estado, trabajos):
+    def insertar_pedidos_varios(self, id_cliente, fecha, fecha_ingreso, estado, trabajos):
         for trabajo in trabajos:
             self.conn.execute(
                 """INSERT INTO pedidos
                    (id_cliente, tipo_trabajo, descripcion, precio_costo,
-                    precio_final, sena, fecha, estado)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    precio_final, sena, fecha, fecha_ingreso, estado)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     id_cliente,
                     trabajo["tipo_trabajo"],
@@ -177,6 +177,7 @@ class Database:
                     trabajo["precio_final"],
                     trabajo["sena"],
                     fecha,
+                    fecha_ingreso,
                     estado
                 )
             )
@@ -190,20 +191,21 @@ class Database:
 
     def actualizar_pedido(self, id_pedido, id_cliente, tipo_trabajo,
                           descripcion, precio_costo, precio_final,
-                          sena, fecha, estado):
+                          sena, fecha, fecha_ingreso, estado):
         self.conn.execute(
             """UPDATE pedidos
-               SET id_cliente   = ?,
-                   tipo_trabajo = ?,
-                   descripcion  = ?,
-                   precio_costo = ?,
-                   precio_final = ?,
-                   sena         = ?,
-                   fecha        = ?,
-                   estado       = ?
+               SET id_cliente    = ?,
+                   tipo_trabajo  = ?,
+                   descripcion   = ?,
+                   precio_costo  = ?,
+                   precio_final  = ?,
+                   sena          = ?,
+                   fecha         = ?,
+                   fecha_ingreso = ?,
+                   estado        = ?
                WHERE id_pedido = ?""",
             (id_cliente, tipo_trabajo, descripcion,
-             precio_costo, precio_final, sena, fecha, estado, id_pedido)
+             precio_costo, precio_final, sena, fecha, fecha_ingreso, estado, id_pedido)
         )
         self.conn.commit()
 
@@ -228,6 +230,14 @@ class Database:
             )
         self.conn.commit()
 
+    def get_subtotales_saldo_por_estado(self):
+        """Subtotal de saldo (sena - precio_final) agrupado por cada estado de pedido."""
+        return self.conn.execute("""
+            SELECT estado, COALESCE(SUM(sena - precio_final), 0) AS subtotal_saldo
+            FROM pedidos
+            GROUP BY estado
+        """).fetchall()
+
     # ====PRESUPUESTOS====
 
     def get_presupuestos(self):
@@ -243,30 +253,31 @@ class Database:
             ORDER BY p.id_presupuesto DESC
         """).fetchall()
 
-    def insertar_presupuesto(self, id_cliente, tipo_trabajo, fecha_ingreso,
+    def insertar_presupuesto(self, id_cliente, tipo_trabajo, descripcion, fecha_ingreso,
                              fecha_inicio, fecha_expiracion, total):
         self.conn.execute(
             """INSERT INTO presupuestos
-               (id_cliente, tipo_trabajo, fecha_ingreso,
+               (id_cliente, tipo_trabajo, descripcion, fecha_ingreso,
                 fecha_inicio, fecha_expiracion, total)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (id_cliente, tipo_trabajo, fecha_ingreso,
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (id_cliente, tipo_trabajo, descripcion, fecha_ingreso,
              fecha_inicio, fecha_expiracion, total)
         )
         self.conn.commit()
 
-    def actualizar_presupuesto(self, id_presupuesto, id_cliente, tipo_trabajo,
+    def actualizar_presupuesto(self, id_presupuesto, id_cliente, tipo_trabajo, descripcion,
                                fecha_ingreso, fecha_inicio, fecha_expiracion, total):
         self.conn.execute(
             """UPDATE presupuestos
                SET id_cliente       = ?,
                    tipo_trabajo     = ?,
+                   descripcion      = ?,
                    fecha_ingreso    = ?,
                    fecha_inicio     = ?,
                    fecha_expiracion = ?,
                    total            = ?
                WHERE id_presupuesto = ?""",
-            (id_cliente, tipo_trabajo, fecha_ingreso,
+            (id_cliente, tipo_trabajo, descripcion, fecha_ingreso,
              fecha_inicio, fecha_expiracion, total, id_presupuesto)
         )
         self.conn.commit()
@@ -291,20 +302,22 @@ class Database:
             return False
 
         fecha_pedido = presupuesto["fecha_inicio"] or presupuesto["fecha_ingreso"]
+        descripcion = presupuesto["descripcion"] if ("descripcion" in presupuesto.keys() and presupuesto["descripcion"]) else "Generado desde presupuesto"
 
         self.conn.execute(
             """INSERT INTO pedidos
                (id_cliente, tipo_trabajo, descripcion, precio_costo,
-                precio_final, sena, fecha, estado)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                precio_final, sena, fecha, fecha_ingreso, estado)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 presupuesto["id_cliente"],
                 presupuesto["tipo_trabajo"],
-                "Generado desde presupuesto",
+                descripcion,
                 0,
                 presupuesto["total"],
                 0,
                 fecha_pedido,
+                presupuesto["fecha_ingreso"],
                 "Pendiente"
             )
         )
@@ -321,7 +334,7 @@ class Database:
         self.conn.commit()
         return True
 
-    
+
     # ==== GASTOS ====
 
     def get_gastos(self):
@@ -442,7 +455,7 @@ class Database:
         ).fetchall()
 
 
-        
+
     # ==== PAGOS ====
 
     def get_pagos_cliente(self, id_cliente):

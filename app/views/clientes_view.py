@@ -2,12 +2,12 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QMessageBox, QLineEdit, QFormLayout, QDialog,
     QDialogButtonBox, QComboBox, QLabel, QGroupBox, QDoubleSpinBox,
-    QTabWidget, QFrame
+    QTabWidget, QFrame, QAbstractItemView
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 import datetime
-
+from app.modules.clientes import ClientesModule
 
 class PagoDialog(QDialog):
     def __init__(self, parent=None, saldo_actual=0.0):
@@ -33,7 +33,10 @@ class PagoDialog(QDialog):
         form.addRow("Fecha:", self.fecha_input)
         form.addRow("Descripción:", self.descripcion_input)
 
-        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
 
@@ -61,20 +64,20 @@ class TrabajosClienteDialog(QDialog):
         self.resize(900, 560)
 
         tabs = QTabWidget()
-        tabs.addTab(self._tab_trabajos(trabajos or []),   "Trabajos")
-        tabs.addTab(self._tab_pagos(pagos or []),         "Pagos adicionales")
+        tabs.addTab(self._tab_trabajos(trabajos or []),  "Trabajos")
+        tabs.addTab(self._tab_pagos(pagos or []),        "Pagos adicionales")
 
         # ── Resumen financiero ──
         resumen = resumen or {}
-        resumen_box = QGroupBox("Resumen financiero")
+        resumen_box = QGroupBox("")
         resumen_layout = QHBoxLayout()
 
         def _stat(label, valor, color=None):
             col = QVBoxLayout()
             lbl = QLabel(label)
-            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             val = QLabel(f"$ {valor:,.2f}")
-            val.setAlignment(Qt.AlignCenter)
+            val.setAlignment(Qt.AlignmentFlag.AlignCenter)
             font = QFont()
             font.setPointSize(13)
             font.setBold(True)
@@ -88,19 +91,19 @@ class TrabajosClienteDialog(QDialog):
         resumen_layout.addLayout(_stat("Total facturado",
                                        resumen.get("total_facturado", 0)))
 
-        sep1 = QFrame(); sep1.setFrameShape(QFrame.VLine)
+        sep1 = QFrame()
+        sep1.setFrameShape(QFrame.Shape.VLine)
         resumen_layout.addWidget(sep1)
 
         resumen_layout.addLayout(_stat("Señas",
                                        resumen.get("total_senas", 0), "#4a9eff"))
-
         resumen_layout.addLayout(_stat("Pagos adicionales",
                                        resumen.get("total_pagos_extra", 0), "#4a9eff"))
-
         resumen_layout.addLayout(_stat("Total pagado",
                                        resumen.get("total_pagado", 0), "#2ecc71"))
 
-        sep2 = QFrame(); sep2.setFrameShape(QFrame.VLine)
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
         resumen_layout.addWidget(sep2)
 
         saldo = resumen.get("saldo", 0)
@@ -110,11 +113,11 @@ class TrabajosClienteDialog(QDialog):
         resumen_box.setLayout(resumen_layout)
 
         # ── Botón pago ──
-        self.btn_pago = QPushButton("💰  Registrar pago")
+        self.btn_pago = QPushButton("Registrar pago")
         self.btn_pago.setFixedHeight(36)
         self.btn_pago.clicked.connect(self._registrar_pago)
 
-        botones = QDialogButtonBox(QDialogButtonBox.Close)
+        botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         botones.rejected.connect(self.reject)
 
         btn_row = QHBoxLayout()
@@ -128,10 +131,9 @@ class TrabajosClienteDialog(QDialog):
         layout.addLayout(btn_row)
         self.setLayout(layout)
 
-        # guardar referencia al tab de pagos y al resumen_box para refrescar
-        self._tabs       = tabs
-        self._resumen_box = resumen_box
-        self._resumen_layout = resumen_layout
+        self._tabs            = tabs
+        self._resumen_box     = resumen_box
+        self._resumen_layout  = resumen_layout
 
     # ── Tabs ──────────────────────────────────────────────────────────────
 
@@ -145,8 +147,8 @@ class TrabajosClienteDialog(QDialog):
             "ID", "Tipo", "Descripción", "Costo", "Final",
             "Seña", "Fecha entrega", "Estado"
         ])
-        tabla.setSelectionBehavior(QTableWidget.SelectRows)
-        tabla.setEditTriggers(QTableWidget.NoEditTriggers)
+        tabla.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         tabla.setRowCount(len(trabajos))
 
         for fila, t in enumerate(trabajos):
@@ -157,7 +159,7 @@ class TrabajosClienteDialog(QDialog):
             ]
             for col, val in enumerate(valores):
                 item = QTableWidgetItem(str(val))
-                item.setTextAlignment(Qt.AlignCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 tabla.setItem(fila, col, item)
         tabla.resizeColumnsToContents()
 
@@ -174,8 +176,8 @@ class TrabajosClienteDialog(QDialog):
         self._tabla_pagos.setHorizontalHeaderLabels(
             ["ID", "Monto", "Fecha", "Descripción"]
         )
-        self._tabla_pagos.setSelectionBehavior(QTableWidget.SelectRows)
-        self._tabla_pagos.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._tabla_pagos.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._tabla_pagos.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._cargar_tabla_pagos(pagos)
 
         self.btn_eliminar_pago = QPushButton("Eliminar pago seleccionado")
@@ -196,7 +198,7 @@ class TrabajosClienteDialog(QDialog):
                 p["descripcion"] or ""
             ]):
                 item = QTableWidgetItem(str(val))
-                item.setTextAlignment(Qt.AlignCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._tabla_pagos.setItem(fila, col, item)
         self._tabla_pagos.resizeColumnsToContents()
 
@@ -207,7 +209,7 @@ class TrabajosClienteDialog(QDialog):
             return
         resumen = self.module.resumen_financiero(self.id_cliente)
         dialog  = PagoDialog(self, saldo_actual=resumen["saldo"])
-        if dialog.exec() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         d = dialog.datos()
         if d["monto"] <= 0:
@@ -227,17 +229,15 @@ class TrabajosClienteDialog(QDialog):
         id_pago = int(self._tabla_pagos.item(fila, 0).text())
         resp = QMessageBox.question(self, "Eliminar pago",
                                     "¿Seguro que querés eliminar este pago?")
-        if resp == QMessageBox.Yes:
+        if resp == QMessageBox.StandardButton.Yes:
             self.module.eliminar_pago(id_pago)
             self._refrescar()
 
     def _refrescar(self):
-        """Recarga pagos y resumen sin cerrar el diálogo."""
         pagos   = self.module.pagos_cliente(self.id_cliente)
         resumen = self.module.resumen_financiero(self.id_cliente)
         self._cargar_tabla_pagos(pagos)
 
-        # Actualizar labels del resumen
         valores = [
             resumen["total_facturado"],
             resumen["total_senas"],
@@ -248,18 +248,17 @@ class TrabajosClienteDialog(QDialog):
         colores = [None, "#4a9eff", "#4a9eff", "#2ecc71",
                    "#e74c3c" if resumen["saldo"] > 0 else "#2ecc71"]
 
-        # Los QLabel de valor son los items en posición impar de resumen_layout
         idx_val = 0
         for i in range(self._resumen_layout.count()):
             item = self._resumen_layout.itemAt(i)
             if item and item.layout():
-                col_lay = item.layout()
-                # segundo widget del sub-layout es el valor
+                col_lay    = item.layout()
                 val_widget = col_lay.itemAt(1).widget()
-                val_widget.setText(f"$ {valores[idx_val]:,.2f}")
-                c = colores[idx_val]
-                val_widget.setStyleSheet(f"color: {c};" if c else "")
-                idx_val += 1
+                if val_widget is not None:
+                    val_widget.setText(f"$ {valores[idx_val]:,.2f}")
+                    c = colores[idx_val]
+                    val_widget.setStyleSheet(f"color: {c};" if c else "")
+                    idx_val += 1
 
 
 class ClienteDialog(QDialog):
@@ -271,17 +270,13 @@ class ClienteDialog(QDialog):
         self.tipo_combo = QComboBox()
         self.tipo_combo.addItems(["Particular", "Empresa"])
 
-        # Campos Particular
-        self.nombre_input       = QLineEdit()
-        self.apellido_input     = QLineEdit()
-        # Campo Empresa
+        self.nombre_input         = QLineEdit()
+        self.apellido_input       = QLineEdit()
         self.nombre_empresa_input = QLineEdit()
-        # Campos comunes
-        self.telefono_input     = QLineEdit()
-        self.direccion_input    = QLineEdit()
-        self.email_input        = QLineEdit()
+        self.telefono_input       = QLineEdit()
+        self.direccion_input      = QLineEdit()
+        self.email_input          = QLineEdit()
 
-        # Precargar si es edición
         if cliente:
             tipo = cliente["tipo_cliente"] or "Particular"
             self.tipo_combo.setCurrentText(tipo)
@@ -294,9 +289,8 @@ class ClienteDialog(QDialog):
         else:
             self.tipo_combo.setCurrentText(tipo_inicial)
 
-        # Layout
-        datos_box  = QGroupBox("Datos del cliente")
-        self.form  = QFormLayout()
+        datos_box = QGroupBox("Datos del cliente")
+        self.form = QFormLayout()
         self.form.addRow("Tipo:", self.tipo_combo)
 
         self.lbl_nombre   = QLabel("Nombre:")
@@ -305,12 +299,15 @@ class ClienteDialog(QDialog):
         self.form.addRow(self.lbl_nombre,   self.nombre_input)
         self.form.addRow(self.lbl_apellido, self.apellido_input)
         self.form.addRow(self.lbl_empresa,  self.nombre_empresa_input)
-        self.form.addRow("Telefono:",   self.telefono_input)
-        self.form.addRow("Direccion:",  self.direccion_input)
-        self.form.addRow("Email:",      self.email_input)
+        self.form.addRow("Telefono:",  self.telefono_input)
+        self.form.addRow("Direccion:", self.direccion_input)
+        self.form.addRow("Email:",     self.email_input)
         datos_box.setLayout(self.form)
 
-        botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save |
+            QDialogButtonBox.StandardButton.Cancel
+        )
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
 
@@ -360,13 +357,13 @@ class ClientesView(QWidget):
             "ID", "Tipo", "Nombre / Empresa",
             "Telefono", "Direccion", "Email", "Trabajos"
         ])
-        self.tabla.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabla.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.tabla.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tabla.cellDoubleClicked.connect(self.abrir_trabajos_cliente)
 
-        self.btn_nuevo    = QPushButton("Nuevo")
-        self.btn_editar   = QPushButton("Editar")
-        self.btn_eliminar = QPushButton("Eliminar")
+        self.btn_nuevo      = QPushButton("Nuevo")
+        self.btn_editar     = QPushButton("Editar")
+        self.btn_eliminar   = QPushButton("Eliminar")
         self.btn_actualizar = QPushButton("Actualizar")
 
         self.btn_nuevo.clicked.connect(self.nuevo_cliente)
@@ -400,17 +397,13 @@ class ClientesView(QWidget):
         self.tabla.setRowCount(len(clientes))
         for fila, c in enumerate(clientes):
             valores = [
-                c["id_cliente"],
-                c["tipo_cliente"],
-                c["cliente"],
-                c["telefono"] or "",
-                c["direccion"] or "",
-                c["email"] or "",
-                c["cantidad_trabajos"],
+                c["id_cliente"], c["tipo_cliente"], c["cliente"],
+                c["telefono"] or "", c["direccion"] or "",
+                c["email"] or "", c["cantidad_trabajos"],
             ]
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
-                item.setTextAlignment(Qt.AlignCenter)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.tabla.setItem(fila, columna, item)
         self.tabla.resizeColumnsToContents()
 
@@ -426,7 +419,7 @@ class ClientesView(QWidget):
         tipo_inicial = tipo_actual if tipo_actual != "Todos" else "Particular"
         dialog = ClienteDialog(self, tipo_inicial=tipo_inicial)
 
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             d = dialog.datos()
             if d["tipo_cliente"] == "Particular":
                 if not d["nombre"] or not d["apellido"]:
@@ -455,7 +448,7 @@ class ClientesView(QWidget):
         cliente = self.module.obtener(id_cliente)
         dialog  = ClienteDialog(self, cliente)
 
-        if dialog.exec() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             d = dialog.datos()
             if d["tipo_cliente"] == "Particular":
                 if not d["nombre"] or not d["apellido"]:
@@ -485,7 +478,7 @@ class ClientesView(QWidget):
             self, "Eliminar cliente",
             "Seguro que queres eliminar este cliente?"
         )
-        if respuesta == QMessageBox.Yes:
+        if respuesta == QMessageBox.StandardButton.Yes:
             self.module.eliminar(id_cliente)
             self.cargar_clientes()
 

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QGroupBox, QLabel
 )
 from PySide6.QtCore import Qt, QDate
+from PySide6.QtGui import QFont
 
 from app.modules.pedidos import PedidosModule
 
@@ -13,15 +14,18 @@ class PedidoDialog(QDialog):
     def __init__(self, parent=None, clientes=None, pedido=None):
         super().__init__(parent)
         self.setWindowTitle("Pedido")
-        self.resize(760, 520)
+        self.resize(600, 480)
 
         self.clientes = clientes or []
         self.pedido = pedido
-        self.trabajos = []
 
         self.cliente_combo = QComboBox()
         for cliente in self.clientes:
             self.cliente_combo.addItem(cliente["cliente"], cliente["id_cliente"])
+
+        self.fecha_ingreso_input = QDateEdit()
+        self.fecha_ingreso_input.setCalendarPopup(True)
+        self.fecha_ingreso_input.setDate(QDate.currentDate())
 
         self.fecha_input = QDateEdit()
         self.fecha_input.setCalendarPopup(True)
@@ -32,6 +36,7 @@ class PedidoDialog(QDialog):
 
         self.tipo_trabajo_input = QLineEdit()
         self.descripcion_input = QTextEdit()
+        self.descripcion_input.setMaximumHeight(70)
 
         self.precio_costo_input = QDoubleSpinBox()
         self.precio_costo_input.setMaximum(999999999)
@@ -45,19 +50,6 @@ class PedidoDialog(QDialog):
         self.sena_input.setMaximum(999999999)
         self.sena_input.setDecimals(2)
 
-        self.tabla_trabajos = QTableWidget()
-        self.tabla_trabajos.setColumnCount(5)
-        self.tabla_trabajos.setHorizontalHeaderLabels([
-            "Tipo", "Descripcion", "Costo", "Final", "Sena"
-        ])
-        self.tabla_trabajos.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabla_trabajos.setEditTriggers(QTableWidget.NoEditTriggers)
-
-        self.btn_agregar_trabajo = QPushButton("Agregar trabajo")
-        self.btn_quitar_trabajo = QPushButton("Quitar trabajo")
-        self.btn_agregar_trabajo.clicked.connect(self.agregar_trabajo)
-        self.btn_quitar_trabajo.clicked.connect(self.quitar_trabajo)
-
         if pedido:
             index_cliente = self.cliente_combo.findData(pedido["id_cliente"])
             if index_cliente >= 0:
@@ -65,6 +57,9 @@ class PedidoDialog(QDialog):
             fecha = QDate.fromString(pedido["fecha"], "yyyy-MM-dd")
             if fecha.isValid():
                 self.fecha_input.setDate(fecha)
+            fecha_ingreso = QDate.fromString(pedido["fecha_ingreso"] or "", "yyyy-MM-dd")
+            if fecha_ingreso.isValid():
+                self.fecha_ingreso_input.setDate(fecha_ingreso)
             index_estado = self.estado_combo.findText(pedido["estado"] or "Pendiente")
             if index_estado >= 0:
                 self.estado_combo.setCurrentIndex(index_estado)
@@ -76,23 +71,37 @@ class PedidoDialog(QDialog):
 
         datos_form = QFormLayout()
         datos_form.addRow("Cliente:", self.cliente_combo)
+        datos_form.addRow("Fecha de ingreso:", self.fecha_ingreso_input)
         datos_form.addRow("Fecha de entrega:", self.fecha_input)
         datos_form.addRow("Estado:", self.estado_combo)
 
         trabajo_form = QFormLayout()
         trabajo_form.addRow("Tipo trabajo:", self.tipo_trabajo_input)
         trabajo_form.addRow("Descripcion:", self.descripcion_input)
-        trabajo_form.addRow("Precio costo:", self.precio_costo_input)
-        trabajo_form.addRow("Precio final:", self.precio_final_input)
-        trabajo_form.addRow("Sena:", self.sena_input)
+
+        # Costo, Final y Sena en una sola fila, 3 columnas
+        precios_layout = QHBoxLayout()
+
+        col_costo = QVBoxLayout()
+        col_costo.addWidget(QLabel("Precio costo:"))
+        col_costo.addWidget(self.precio_costo_input)
+
+        col_final = QVBoxLayout()
+        col_final.addWidget(QLabel("Precio final:"))
+        col_final.addWidget(self.precio_final_input)
+
+        col_sena = QVBoxLayout()
+        col_sena.addWidget(QLabel("Sena:"))
+        col_sena.addWidget(self.sena_input)
+
+        precios_layout.addLayout(col_costo)
+        precios_layout.addLayout(col_final)
+        precios_layout.addLayout(col_sena)
+
+        trabajo_form.addRow(precios_layout)
 
         trabajo_box = QGroupBox("Trabajo")
         trabajo_box.setLayout(trabajo_form)
-
-        trabajo_botones = QHBoxLayout()
-        trabajo_botones.addWidget(self.btn_agregar_trabajo)
-        trabajo_botones.addWidget(self.btn_quitar_trabajo)
-        trabajo_botones.addStretch()
 
         botones = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         botones.accepted.connect(self.validar_y_aceptar)
@@ -101,12 +110,8 @@ class PedidoDialog(QDialog):
         layout = QVBoxLayout()
         layout.addLayout(datos_form)
         layout.addWidget(trabajo_box)
-
-        if not pedido:
-            layout.addLayout(trabajo_botones)
-            layout.addWidget(self.tabla_trabajos)
-
         layout.addWidget(botones)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.NoFrame)
@@ -119,61 +124,10 @@ class PedidoDialog(QDialog):
         _outer.addWidget(scroll)
         self.setLayout(_outer)
 
-    def agregar_trabajo(self):
-        tipo_trabajo = self.tipo_trabajo_input.text().strip()
-        if not tipo_trabajo:
+    def validar_y_aceptar(self):
+        if not self.tipo_trabajo_input.text().strip():
             QMessageBox.warning(self, "Datos incompletos", "El tipo de trabajo es obligatorio.")
             return
-        trabajo = {
-            "tipo_trabajo": tipo_trabajo,
-            "descripcion": self.descripcion_input.toPlainText().strip(),
-            "precio_costo": self.precio_costo_input.value(),
-            "precio_final": self.precio_final_input.value(),
-            "sena": self.sena_input.value(),
-        }
-        self.trabajos.append(trabajo)
-        self.cargar_tabla_trabajos()
-        self.limpiar_form_trabajo()
-
-    def quitar_trabajo(self):
-        fila = self.tabla_trabajos.currentRow()
-        if fila < 0:
-            QMessageBox.warning(self, "Seleccion requerida", "Selecciona un trabajo.")
-            return
-        self.trabajos.pop(fila)
-        self.cargar_tabla_trabajos()
-
-    def cargar_tabla_trabajos(self):
-        self.tabla_trabajos.setRowCount(len(self.trabajos))
-        for fila, trabajo in enumerate(self.trabajos):
-            valores = [
-                trabajo["tipo_trabajo"], trabajo["descripcion"],
-                trabajo["precio_costo"], trabajo["precio_final"], trabajo["sena"],
-            ]
-            for columna, valor in enumerate(valores):
-                item = QTableWidgetItem(str(valor))
-                item.setTextAlignment(Qt.AlignCenter)
-                self.tabla_trabajos.setItem(fila, columna, item)
-        self.tabla_trabajos.resizeColumnsToContents()
-
-    def limpiar_form_trabajo(self):
-        self.tipo_trabajo_input.clear()
-        self.descripcion_input.clear()
-        self.precio_costo_input.setValue(0)
-        self.precio_final_input.setValue(0)
-        self.sena_input.setValue(0)
-
-    def validar_y_aceptar(self):
-        if self.pedido:
-            if not self.tipo_trabajo_input.text().strip():
-                QMessageBox.warning(self, "Datos incompletos", "El tipo de trabajo es obligatorio.")
-                return
-        else:
-            if self.tipo_trabajo_input.text().strip():
-                self.agregar_trabajo()
-            if not self.trabajos:
-                QMessageBox.warning(self, "Datos incompletos", "Agrega al menos un trabajo.")
-                return
         self.accept()
 
     def datos_edicion(self):
@@ -185,15 +139,24 @@ class PedidoDialog(QDialog):
             "precio_final": self.precio_final_input.value(),
             "sena": self.sena_input.value(),
             "fecha": self.fecha_input.date().toString("yyyy-MM-dd"),
+            "fecha_ingreso": self.fecha_ingreso_input.date().toString("yyyy-MM-dd"),
             "estado": self.estado_combo.currentText(),
         }
 
     def datos_creacion(self):
+        trabajo = {
+            "tipo_trabajo": self.tipo_trabajo_input.text().strip(),
+            "descripcion": self.descripcion_input.toPlainText().strip(),
+            "precio_costo": self.precio_costo_input.value(),
+            "precio_final": self.precio_final_input.value(),
+            "sena": self.sena_input.value(),
+        }
         return {
             "id_cliente": self.cliente_combo.currentData(),
             "fecha": self.fecha_input.date().toString("yyyy-MM-dd"),
+            "fecha_ingreso": self.fecha_ingreso_input.date().toString("yyyy-MM-dd"),
             "estado": self.estado_combo.currentText(),
-            "trabajos": self.trabajos,
+            "trabajos": [trabajo],
         }
 
 
@@ -216,10 +179,10 @@ class PedidosView(QWidget):
         self.tabla = QTableWidget()
         self.tabla.setAlternatingRowColors(True)
         self.tabla.verticalHeader().setVisible(False)
-        self.tabla.setColumnCount(9)
+        self.tabla.setColumnCount(11)
         self.tabla.setHorizontalHeaderLabels([
             "ID", "Cliente", "Tipo", "Descripcion", "Costo",
-            "Final", "Sena", "Fecha de entrega", "Estado"
+            "Final", "Sena", "Saldo", "Fecha ingreso", "Fecha de entrega", "Estado"
         ])
         self.tabla.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -247,10 +210,24 @@ class PedidosView(QWidget):
         botones_layout.addStretch()
         botones_layout.addWidget(self.btn_actualizar)
 
+        
+        self.lbl_subtotal = QLabel("$0.00")
+        fuente_subtotal = QFont()
+        fuente_subtotal.setBold(True)
+        fuente_subtotal.setPointSize(13)
+        self.lbl_subtotal.setFont(fuente_subtotal)
+        self.lbl_subtotal.setStyleSheet("color: #2ecc71;")  # verde
+        self.lbl_subtotal.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        subtotal_layout = QHBoxLayout()
+        subtotal_layout.addStretch()
+        subtotal_layout.addWidget(self.lbl_subtotal)
+
         layout = QVBoxLayout()
         layout.addLayout(filtro_layout)
         layout.addLayout(botones_layout)
         layout.addWidget(self.tabla)
+        layout.addLayout(subtotal_layout)
 
         self.setLayout(layout)
         self.cargar_pedidos()
@@ -265,6 +242,7 @@ class PedidosView(QWidget):
             filtrados = self.pedidos_cache
 
         self._poblar_tabla(filtrados)
+        self._actualizar_subtotal(filtrados)
         if self.buscador.text():
             self.filtrar_tabla(self.buscador.text())
 
@@ -274,14 +252,18 @@ class PedidosView(QWidget):
             valores = [
                 pedido["id_pedido"], pedido["cliente"], pedido["tipo_trabajo"],
                 pedido["descripcion"] or "", pedido["precio_costo"],
-                pedido["precio_final"], pedido["sena"],
-                pedido["fecha"], pedido["estado"],
+                pedido["precio_final"], pedido["sena"], pedido["saldo"],
+                pedido["fecha_ingreso"] or "", pedido["fecha"], pedido["estado"],
             ]
             for columna, valor in enumerate(valores):
                 item = QTableWidgetItem(str(valor))
                 item.setTextAlignment(Qt.AlignCenter)
                 self.tabla.setItem(fila, columna, item)
         self.tabla.resizeColumnsToContents()
+
+    def _actualizar_subtotal(self, pedidos):
+        total_saldo = sum((p["saldo"] or 0) for p in pedidos)
+        self.lbl_subtotal.setText(f"${total_saldo:.2f}")
 
     def filtrar_tabla(self, texto):
         texto = texto.lower().strip()
@@ -302,7 +284,6 @@ class PedidosView(QWidget):
         if fila < 0 or self.tabla.isRowHidden(fila):
             QMessageBox.warning(self, "Seleccion requerida", "Selecciona un pedido.")
             return None
-        # Buscar en cache por ID
         id_pedido = int(self.tabla.item(fila, 0).text())
         for p in self.pedidos_cache:
             if p["id_pedido"] == id_pedido:
@@ -317,7 +298,10 @@ class PedidosView(QWidget):
         dialog = PedidoDialog(self, clientes=clientes)
         if dialog.exec() == QDialog.Accepted:
             datos = dialog.datos_creacion()
-            self.module.crear_varios(datos["id_cliente"], datos["fecha"], datos["estado"], datos["trabajos"])
+            self.module.crear_varios(
+                datos["id_cliente"], datos["fecha"], datos["fecha_ingreso"],
+                datos["estado"], datos["trabajos"]
+            )
             self.cargar_pedidos()
 
     def editar_pedido(self):
@@ -338,7 +322,7 @@ class PedidosView(QWidget):
             self.module.editar(
                 pedido["id_pedido"], datos["id_cliente"], datos["tipo_trabajo"],
                 datos["descripcion"], datos["precio_costo"], datos["precio_final"],
-                datos["sena"], datos["fecha"], datos["estado"]
+                datos["sena"], datos["fecha"], datos["fecha_ingreso"], datos["estado"]
             )
             self.cargar_pedidos()
 
