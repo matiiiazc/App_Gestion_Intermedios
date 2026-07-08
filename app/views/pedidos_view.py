@@ -1,13 +1,18 @@
+import os
+import sys
+import subprocess
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QScrollArea,
     QPushButton, QMessageBox, QLineEdit, QFormLayout, QDialog,
     QDialogButtonBox, QComboBox, QTextEdit, QDoubleSpinBox, QDateEdit,
-    QGroupBox, QLabel
+    QGroupBox, QLabel, QFileDialog
 )
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
 
 from app.modules.pedidos import PedidosModule
+from app.modules.orden_pedido_pdf import generar_pdf_orden_pedido, get_base_path
 
 
 class PedidoDialog(QDialog):
@@ -190,11 +195,13 @@ class PedidosView(QWidget):
         self.btn_nuevo = QPushButton("Nuevo")
         self.btn_editar = QPushButton("Editar")
         self.btn_eliminar = QPushButton("Eliminar")
+        self.btn_orden_pedido = QPushButton("Generar orden de pedido")
         self.btn_actualizar = QPushButton("Actualizar")
 
         self.btn_nuevo.clicked.connect(self.nuevo_pedido)
         self.btn_editar.clicked.connect(self.editar_pedido)
         self.btn_eliminar.clicked.connect(self.eliminar_pedido)
+        self.btn_orden_pedido.clicked.connect(self.generar_orden_pedido)
         self.btn_actualizar.clicked.connect(self.cargar_pedidos)
 
         filtro_layout = QHBoxLayout()
@@ -207,6 +214,7 @@ class PedidosView(QWidget):
         botones_layout.addWidget(self.btn_nuevo)
         botones_layout.addWidget(self.btn_editar)
         botones_layout.addWidget(self.btn_eliminar)
+        botones_layout.addWidget(self.btn_orden_pedido)
         botones_layout.addStretch()
         botones_layout.addWidget(self.btn_actualizar)
 
@@ -334,3 +342,45 @@ class PedidosView(QWidget):
         if respuesta == QMessageBox.Yes:
             self.module.eliminar(pedido["id_pedido"])
             self.cargar_pedidos()
+
+    def generar_orden_pedido(self):
+        pedido = self.pedido_seleccionado()
+        if pedido is None:
+            return
+
+        carpeta = get_base_path() / "Ordenes de pedido"
+        try:
+            carpeta.mkdir(parents=True, exist_ok=True)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo crear la carpeta 'Ordenes de pedido':\n{error}")
+            return
+
+        cliente_limpio = "".join(
+            c for c in str(pedido["cliente"]) if c.isalnum() or c in (" ", "_", "-")
+        ).strip().replace(" ", "_")
+        nombre_archivo = f"orden_pedido_{pedido['id_pedido']:04d}_{cliente_limpio}.pdf"
+        ruta = carpeta / nombre_archivo
+
+        try:
+            generar_pdf_orden_pedido(pedido, ruta)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo generar la orden de pedido:\n{error}")
+            return
+
+        respuesta = QMessageBox.question(
+            self, "Orden generada",
+            f"La orden de pedido se guardo en:\n{ruta}\n\nQueres abrirla ahora?"
+        )
+        if respuesta == QMessageBox.Yes:
+            self._abrir_archivo(str(ruta))
+
+    def _abrir_archivo(self, ruta):
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(ruta)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", ruta], check=False)
+            else:
+                subprocess.run(["xdg-open", ruta], check=False)
+        except Exception as error:
+            QMessageBox.warning(self, "Aviso", f"No se pudo abrir el archivo automaticamente:\n{error}")

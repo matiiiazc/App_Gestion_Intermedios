@@ -206,7 +206,7 @@ class GananciasView(QWidget):
         color_neta = "#4ade80" if ganancia_neta >= 0 else "#f87171"
         self.lbl_neta.setText(f"Ganancia Neta: {_fmt(ganancia_neta)}")
         self.lbl_neta.setStyleSheet(
-            f"font-size: 18px; font-weight: 700; color: {color_neta}; background: transparent;"
+            f"font-size: 13px; font-weight: 700; color: {color_neta}; background: transparent;"
         )
 
         # ==== TOP PROVEEDORES ====

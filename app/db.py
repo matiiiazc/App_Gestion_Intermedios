@@ -137,7 +137,9 @@ class Database:
                 CASE
                     WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
                     ELSE c.nombre || ' ' || c.apellido
-                END AS cliente
+                END AS cliente,
+                c.telefono AS telefono_cliente,
+                c.direccion AS direccion_cliente
             FROM pedidos p
             JOIN clientes c ON p.id_cliente = c.id_cliente
             ORDER BY p.id_pedido DESC
