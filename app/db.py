@@ -133,7 +133,7 @@ class Database:
         return self.conn.execute("""
             SELECT
                 p.*,
-                (p.sena - p.precio_final) AS saldo,
+                (p.precio_final - p.sena ) AS saldo,
                 CASE
                     WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
                     ELSE c.nombre || ' ' || c.apellido
