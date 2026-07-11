@@ -100,6 +100,13 @@ class GananciasView(QWidget):
         left_w.setLayout(left)
         left_w.setFixedWidth(240)
 
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        left_scroll.setFrameShape(QScrollArea.NoFrame)
+        left_scroll.setWidget(left_w)
+        left_scroll.setFixedWidth(258)  # ancho del contenido + lugar para la barra de scroll
+
         # ==== DERECHA: TABLAS ====
         right = QVBoxLayout()
         right.setSpacing(14)
@@ -126,7 +133,7 @@ class GananciasView(QWidget):
         right_w = QWidget()
         right_w.setLayout(right)
 
-        root.addWidget(left_w)
+        root.addWidget(left_scroll)
         root.addWidget(right_w, 1)
 
     def _limpiar_layout(self, layout):
@@ -206,7 +213,7 @@ class GananciasView(QWidget):
         color_neta = "#4ade80" if ganancia_neta >= 0 else "#f87171"
         self.lbl_neta.setText(f"Ganancia Neta: {_fmt(ganancia_neta)}")
         self.lbl_neta.setStyleSheet(
-            f"font-size: 13px; font-weight: 700; color: {color_neta}; background: transparent;"
+            f"font-size: 10px; font-weight: 700; color: {color_neta}; background: transparent;"
         )
 
         # ==== TOP PROVEEDORES ====

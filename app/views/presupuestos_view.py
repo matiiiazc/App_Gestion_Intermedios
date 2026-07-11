@@ -1,3 +1,7 @@
+import os
+import sys
+import subprocess
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QScrollArea,
     QPushButton, QMessageBox, QLineEdit, QFormLayout, QDialog,
@@ -6,6 +10,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 
 from app.modules.presupuestos import PresupuestosModule
+from app.modules.presupuesto_pdf import generar_pdf_presupuesto
+from app.modules.orden_pedido_pdf import get_base_path
+from app.widgets import ComboBoxSinScroll
 
 
 class PresupuestoDialog(QDialog):
@@ -15,7 +22,7 @@ class PresupuestoDialog(QDialog):
         self.resize(430, 400)
         self.presupuesto = presupuesto
 
-        self.cliente_combo = QComboBox()
+        self.cliente_combo = ComboBoxSinScroll()
         self.clientes = clientes or []
         for cliente in self.clientes:
             self.cliente_combo.addItem(cliente["cliente"], cliente["id_cliente"])
@@ -113,7 +120,7 @@ class PresupuestosView(QWidget):
         self.buscador.textChanged.connect(self.filtrar_tabla)
         self.buscador.setMinimumWidth(280)
 
-        self.filtro_estado = QComboBox()
+        self.filtro_estado = ComboBoxSinScroll()
         self.filtro_estado.addItems(["Todos", "Pendiente", "Aceptado", "Rechazado"])
         self.filtro_estado.currentTextChanged.connect(self.cargar_presupuestos)
 
@@ -133,12 +140,14 @@ class PresupuestosView(QWidget):
         self.btn_eliminar = QPushButton("Eliminar")
         self.btn_actualizar = QPushButton("Actualizar")
         self.btn_aceptar = QPushButton("Aceptar presupuesto")
+        self.btn_generar_pdf = QPushButton("Generar presupuesto")
 
         self.btn_nuevo.clicked.connect(self.nuevo_presupuesto)
         self.btn_editar.clicked.connect(self.editar_presupuesto)
         self.btn_eliminar.clicked.connect(self.eliminar_presupuesto)
         self.btn_actualizar.clicked.connect(self.cargar_presupuestos)
         self.btn_aceptar.clicked.connect(self.aceptar_presupuesto)
+        self.btn_generar_pdf.clicked.connect(self.generar_presupuesto_pdf)
 
         filtro_layout = QHBoxLayout()
         filtro_layout.addWidget(QLabel("Estado:"))
@@ -151,6 +160,7 @@ class PresupuestosView(QWidget):
         botones_layout.addWidget(self.btn_editar)
         botones_layout.addWidget(self.btn_aceptar)
         botones_layout.addWidget(self.btn_eliminar)
+        botones_layout.addWidget(self.btn_generar_pdf)
         botones_layout.addStretch()
         botones_layout.addWidget(self.btn_actualizar)
 
@@ -280,3 +290,45 @@ class PresupuestosView(QWidget):
                 QMessageBox.information(self, "Presupuesto aceptado", "El presupuesto se agrego automaticamente a pedidos.")
             else:
                 QMessageBox.warning(self, "No se pudo aceptar", "No se pudo aceptar el presupuesto.")
+
+    def generar_presupuesto_pdf(self):
+        presupuesto = self.presupuesto_seleccionado()
+        if presupuesto is None:
+            return
+
+        carpeta = get_base_path() / "Presupuestos generados"
+        try:
+            carpeta.mkdir(parents=True, exist_ok=True)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo crear la carpeta 'Presupuestos generados':\n{error}")
+            return
+
+        cliente_limpio = "".join(
+            c for c in str(presupuesto["cliente"]) if c.isalnum() or c in (" ", "_", "-")
+        ).strip().replace(" ", "_")
+        nombre_archivo = f"presupuesto_{presupuesto['id_presupuesto']:04d}_{cliente_limpio}.pdf"
+        ruta = carpeta / nombre_archivo
+
+        try:
+            generar_pdf_presupuesto(presupuesto, ruta)
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo generar el presupuesto:\n{error}")
+            return
+
+        respuesta = QMessageBox.question(
+            self, "Presupuesto generado",
+            f"El presupuesto se guardo en:\n{ruta}\n\nQueres abrirlo ahora?"
+        )
+        if respuesta == QMessageBox.Yes:
+            self._abrir_archivo(str(ruta))
+
+    def _abrir_archivo(self, ruta):
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(ruta)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", ruta], check=False)
+            else:
+                subprocess.run(["xdg-open", ruta], check=False)
+        except Exception as error:
+            QMessageBox.warning(self, "Aviso", f"No se pudo abrir el archivo automaticamente:\n{error}")

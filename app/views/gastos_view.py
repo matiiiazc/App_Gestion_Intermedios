@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 
 from app.modules.gastos import GastosModule, CATEGORIAS
+from app.widgets import ComboBoxSinScroll
 
 
 def _fmt(n: float) -> str:
@@ -74,7 +75,7 @@ class GastoDialog(QDialog):
         self.producto_input = QLineEdit()
 
         # Proveedor — combo editable con lista de existentes
-        self.proveedor_combo = QComboBox()
+        self.proveedor_combo = ComboBoxSinScroll()
         self.proveedor_combo.setEditable(True)
         self.proveedor_combo.addItem("")
         for p in (proveedores or []):
@@ -87,7 +88,7 @@ class GastoDialog(QDialog):
         self.descripcion_input.setPlaceholderText("Descripción opcional...")
 
         # Categoria
-        self.categoria_combo = QComboBox()
+        self.categoria_combo = ComboBoxSinScroll()
         self.categoria_combo.addItems(CATEGORIAS)
 
         # Fecha

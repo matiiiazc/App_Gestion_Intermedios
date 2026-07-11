@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea,
     QDialog, QFormLayout, QDoubleSpinBox, QComboBox,
     QDialogButtonBox, QGroupBox, QTableWidget, QTableWidgetItem,
     QGridLayout, QFrame, QMessageBox, QDateEdit
@@ -8,6 +9,7 @@ from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
 
 from app.modules.pagos import PagosModule, EMPLEADOS, TARIFA_HORA
+from app.widgets import ComboBoxSinScroll
 
 
 def _fmt(n: float) -> str:
@@ -84,7 +86,7 @@ class PagoDialog(QDialog):
         self.setMinimumWidth(300)
         self.saldos = saldos
 
-        self.combo_emp = QComboBox()
+        self.combo_emp = ComboBoxSinScroll()
         self.combo_emp.addItems(EMPLEADOS)
         self.combo_emp.currentTextChanged.connect(self._actualizar_pendiente)
 
@@ -96,7 +98,7 @@ class PagoDialog(QDialog):
         self.spin_monto.setSingleStep(1000)
         self.spin_monto.setPrefix("$ ")
 
-        self.combo_modal = QComboBox()
+        self.combo_modal = ComboBoxSinScroll()
         self.combo_modal.addItems(["Efectivo", "Transferencia"])
 
         self.fecha_input = QDateEdit()
@@ -394,7 +396,7 @@ class PagosView(QWidget):
         hist_box = QGroupBox("Últimos registros")
         hist_layout = QVBoxLayout(hist_box)
 
-        self.combo_hist_emp = QComboBox()
+        self.combo_hist_emp = ComboBoxSinScroll()
         self.combo_hist_emp.addItems(EMPLEADOS)
         self.combo_hist_emp.currentTextChanged.connect(self._cargar_historial)
 
@@ -416,8 +418,21 @@ class PagosView(QWidget):
         right_w = QWidget()
         right_w.setLayout(right)
 
-        root.addWidget(left_w)
-        root.addWidget(right_w, 1)
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        left_scroll.setFrameShape(QScrollArea.NoFrame)
+        left_scroll.setWidget(left_w)
+        left_scroll.setFixedWidth(338)  # ancho del contenido + lugar para la barra de scroll
+
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        right_scroll.setFrameShape(QScrollArea.NoFrame)
+        right_scroll.setWidget(right_w)
+
+        root.addWidget(left_scroll)
+        root.addWidget(right_scroll, 1)
 
         self._cargar_historial(EMPLEADOS[0])
 

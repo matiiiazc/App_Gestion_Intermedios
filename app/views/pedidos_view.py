@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont
 
 from app.modules.pedidos import PedidosModule
 from app.modules.orden_pedido_pdf import generar_pdf_orden_pedido, get_base_path
+from app.widgets import ComboBoxSinScroll
 
 
 class PedidoDialog(QDialog):
@@ -24,7 +25,7 @@ class PedidoDialog(QDialog):
         self.clientes = clientes or []
         self.pedido = pedido
 
-        self.cliente_combo = QComboBox()
+        self.cliente_combo = ComboBoxSinScroll()
         for cliente in self.clientes:
             self.cliente_combo.addItem(cliente["cliente"], cliente["id_cliente"])
 
@@ -36,7 +37,7 @@ class PedidoDialog(QDialog):
         self.fecha_input.setCalendarPopup(True)
         self.fecha_input.setDate(QDate.currentDate())
 
-        self.estado_combo = QComboBox()
+        self.estado_combo = ComboBoxSinScroll()
         self.estado_combo.addItems(["Pendiente", "En proceso", "Terminado", "Entregado", "Cancelado"])
 
         self.tipo_trabajo_input = QLineEdit()
@@ -130,10 +131,25 @@ class PedidoDialog(QDialog):
         self.setLayout(_outer)
 
     def validar_y_aceptar(self):
-        if not self.tipo_trabajo_input.text().strip():
-            QMessageBox.warning(self, "Datos incompletos", "El tipo de trabajo es obligatorio.")
-            return
-        self.accept()
+            if not self.tipo_trabajo_input.text().strip():
+                QMessageBox.warning(self, "Datos incompletos", "El tipo de trabajo es obligatorio.")
+                return
+
+            entrega = self.fecha_input.date()
+            dias_diferencia = QDate.currentDate().daysTo(entrega)
+
+            if dias_diferencia > 180:  # más de 6 meses a futuro
+                resp = QMessageBox.question(
+                    self,
+                    "Confirmar fecha de entrega",
+                    f"La fecha de entrega es {entrega.toString('dd/MM/yyyy')}, "
+                    f"bastante lejos en el futuro.\n¿Es correcto?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if resp == QMessageBox.No:
+                    return
+
+            self.accept()
 
     def datos_edicion(self):
         return {
@@ -166,18 +182,26 @@ class PedidoDialog(QDialog):
 
 
 class PedidosView(QWidget):
+
+    COLUMNAS_ORDENABLES = {
+        8: "fecha_ingreso",
+        9: "fecha",
+    }
+
     def __init__(self):
         super().__init__()
 
         self.module = PedidosModule()
         self.pedidos_cache = []
+        self.orden_columna = None
+        self.orden_dir = "DESC"
 
         self.buscador = QLineEdit()
         self.buscador.setPlaceholderText("Buscar por cliente, tipo, descripcion, estado...")
         self.buscador.textChanged.connect(self.filtrar_tabla)
         self.buscador.setMinimumWidth(320)
 
-        self.filtro_estado = QComboBox()
+        self.filtro_estado = ComboBoxSinScroll()
         self.filtro_estado.addItems(["Todos", "Pendiente", "En proceso", "Terminado", "Entregado", "Cancelado"])
         self.filtro_estado.currentTextChanged.connect(self.cargar_pedidos)
 
@@ -191,6 +215,8 @@ class PedidosView(QWidget):
         ])
         self.tabla.setSelectionBehavior(QTableWidget.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabla.horizontalHeader().setSectionsClickable(True)
+        self.tabla.horizontalHeader().sectionClicked.connect(self._ordenar_por_columna)
 
         self.btn_nuevo = QPushButton("Nuevo")
         self.btn_editar = QPushButton("Editar")
@@ -240,6 +266,19 @@ class PedidosView(QWidget):
         self.setLayout(layout)
         self.cargar_pedidos()
 
+    def _ordenar_por_columna(self, index):
+        columna = self.COLUMNAS_ORDENABLES.get(index)
+        if columna is None:
+            return
+
+        if self.orden_columna == columna:
+            self.orden_dir = "ASC" if self.orden_dir == "DESC" else "DESC"
+        else:
+            self.orden_columna = columna
+            self.orden_dir = "DESC"
+
+        self.cargar_pedidos()
+
     def cargar_pedidos(self):
         self.pedidos_cache = self.module.listar()
         estado_filtro = self.filtro_estado.currentText()
@@ -248,6 +287,13 @@ class PedidosView(QWidget):
             filtrados = [p for p in self.pedidos_cache if p["estado"] == estado_filtro]
         else:
             filtrados = self.pedidos_cache
+
+        if self.orden_columna:
+            filtrados = sorted(
+                filtrados,
+                key=lambda p: p[self.orden_columna] or "",
+                reverse=(self.orden_dir == "DESC")
+            )
 
         self._poblar_tabla(filtrados)
         self._actualizar_subtotal(filtrados)

@@ -249,7 +249,9 @@ class Database:
                 CASE
                     WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
                     ELSE c.nombre || ' ' || c.apellido
-                END AS cliente
+                END AS cliente,
+                c.telefono AS telefono_cliente,
+                c.direccion AS direccion_cliente
             FROM presupuestos p
             JOIN clientes c ON p.id_cliente = c.id_cliente
             ORDER BY p.id_presupuesto DESC
@@ -413,15 +415,15 @@ class Database:
     def get_pedidos_por_periodo(self, fecha_desde: str, fecha_hasta: str):
         return self.conn.execute(
             """SELECT
-                   p.*,
-                   CASE
-                       WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
-                       ELSE c.nombre || ' ' || c.apellido
-                   END AS cliente
-               FROM pedidos p
-               JOIN clientes c ON p.id_cliente = c.id_cliente
-               WHERE p.fecha BETWEEN ? AND ?
-               ORDER BY p.fecha DESC""",
+                p.*,
+                CASE
+                    WHEN c.tipo_cliente = 'Empresa' THEN c.nombre_empresa
+                    ELSE c.nombre || ' ' || c.apellido
+                END AS cliente
+            FROM pedidos p
+            JOIN clientes c ON p.id_cliente = c.id_cliente
+            WHERE p.fecha_ingreso BETWEEN ? AND ?
+            ORDER BY p.fecha_ingreso DESC""",
             (fecha_desde, fecha_hasta)
         ).fetchall()
 

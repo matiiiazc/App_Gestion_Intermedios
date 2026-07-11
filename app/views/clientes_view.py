@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 import datetime
 from app.modules.clientes import ClientesModule
+from app.widgets import ComboBoxSinScroll
 
 class PagoDialog(QDialog):
     def __init__(self, parent=None, saldo_actual=0.0):
@@ -267,7 +268,7 @@ class ClienteDialog(QDialog):
         self.setWindowTitle("Cliente")
         self.resize(420, 340)
 
-        self.tipo_combo = QComboBox()
+        self.tipo_combo = ComboBoxSinScroll()
         self.tipo_combo.addItems(["Particular", "Empresa"])
 
         self.nombre_input         = QLineEdit()
@@ -345,7 +346,7 @@ class ClientesView(QWidget):
         super().__init__()
         self.module = ClientesModule()
 
-        self.filtro_tipo = QComboBox()
+        self.filtro_tipo = ComboBoxSinScroll()
         self.filtro_tipo.addItems(["Todos", "Particular", "Empresa"])
         self.filtro_tipo.currentTextChanged.connect(self.cargar_clientes)
 

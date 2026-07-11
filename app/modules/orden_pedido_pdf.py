@@ -63,14 +63,7 @@ def _formato_fecha(fecha_str):
 
 
 def generar_pdf_orden_pedido(pedido, ruta_salida):
-    """
-    Genera el PDF de la orden de pedido.
-
-    pedido: dict o sqlite3.Row con las claves:
-        id_pedido, cliente, telefono_cliente, direccion_cliente,
-        tipo_trabajo, descripcion, precio_final, sena, fecha, fecha_ingreso
-    ruta_salida: ruta (str o Path) donde se guarda el PDF.
-    """
+  
     if not TEMPLATE_PATH.exists():
         raise FileNotFoundError(f"No se encontro la plantilla en: {TEMPLATE_PATH}")
 
@@ -95,24 +88,27 @@ def generar_pdf_orden_pedido(pedido, ruta_salida):
     c.drawCentredString(x, y, f"{int(get('id_pedido', 0)):04d}")
 
     # Cliente
-    c.setFont("Helvetica", 11)
+    c.setFont("Helvetica", 13)
     x, y = _px(95, 120)
     c.drawString(x, y, str(get("cliente")))
 
     # Telefono
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(478, 120)
     c.drawString(x, y, str(get("telefono_cliente")))
 
     # Domicilio
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(100, 151)
     c.drawString(x, y, str(get("direccion_cliente")))
 
     # Categoria (tipo de trabajo)
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(120, 189)
     c.drawString(x, y, str(get("tipo_trabajo")))
 
     # Detalle (descripcion, con salto de linea automatico)
-    c.setFont("Helvetica", 9)
+    c.setFont("Helvetica", 13)
     detalle = str(get("descripcion"))
     lineas = wrap(detalle, width=95) if detalle else []
     x, y = _px(20, 240)
@@ -122,7 +118,7 @@ def generar_pdf_orden_pedido(pedido, ruta_salida):
         y -= 12
 
     # Fecha de pedido
-    c.setFont("Helvetica-Bold", 11)
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(684, 133)
     c.drawCentredString(x, y, _formato_fecha(get("fecha_ingreso")))
 
@@ -131,15 +127,17 @@ def generar_pdf_orden_pedido(pedido, ruta_salida):
     c.drawCentredString(x, y, _formato_fecha(get("fecha")))
 
     # Total
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(104, 362)
     c.drawCentredString(x, y, _formato_moneda(total))
 
     # Sena
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(293, 362)
     c.drawCentredString(x, y, _formato_moneda(sena))
 
     # Saldo
+    c.setFont("Helvetica-Bold", 13)
     x, y = _px(477, 362)
     c.drawCentredString(x, y, _formato_moneda(saldo))
 
