@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QGroupBox, QFrame, QDateEdit, QPushButton, QScrollArea
+    QLabel, QGroupBox, QFrame, QDateEdit, QPushButton, QScrollArea,
+    QMessageBox, QFileDialog
 )
 from PySide6.QtCore import Qt, QDate
 
 from app.modules.ganancias import GananciasModule
+from app.modules.ganancias_pdf import generar_pdf_ganancias
 
 
 def _fmt(n: float) -> str:
@@ -31,6 +33,22 @@ class GananciasView(QWidget):
         periodo_lay = QVBoxLayout(periodo_box)
         periodo_lay.setSpacing(8)
 
+        # accesos rápidos
+        accesos_lay = QHBoxLayout()
+        accesos_lay.setSpacing(4)
+        btn_hoy = QPushButton("Hoy")
+        btn_mes_actual = QPushButton("Este mes")
+        btn_mes_pasado = QPushButton("Mes pasado")
+        btn_hoy.clicked.connect(self._set_periodo_hoy)
+        btn_mes_actual.clicked.connect(self._set_periodo_mes_actual)
+        btn_mes_pasado.clicked.connect(self._set_periodo_mes_pasado)
+        for b in (btn_hoy, btn_mes_actual, btn_mes_pasado):
+            b.setStyleSheet("font-size: 11px; padding: 4px;")
+        accesos_lay.addWidget(btn_hoy)
+        accesos_lay.addWidget(btn_mes_actual)
+        accesos_lay.addWidget(btn_mes_pasado)
+        periodo_lay.addLayout(accesos_lay)
+
         lbl_desde = QLabel("Desde:")
         self.fecha_desde = QDateEdit()
         self.fecha_desde.setCalendarPopup(True)
@@ -46,11 +64,15 @@ class GananciasView(QWidget):
         btn_consultar = QPushButton("Consultar")
         btn_consultar.clicked.connect(self._consultar)
 
+        btn_exportar_pdf = QPushButton("Exportar PDF")
+        btn_exportar_pdf.clicked.connect(self._exportar_pdf)
+
         periodo_lay.addWidget(lbl_desde)
         periodo_lay.addWidget(self.fecha_desde)
         periodo_lay.addWidget(lbl_hasta)
         periodo_lay.addWidget(self.fecha_hasta)
         periodo_lay.addWidget(btn_consultar)
+        periodo_lay.addWidget(btn_exportar_pdf)
 
         left.addWidget(periodo_box)
 
@@ -168,12 +190,40 @@ class GananciasView(QWidget):
         fl.addWidget(lbl_valor)
         return frame
 
+    def _set_periodo_hoy(self):
+        hoy = QDate.currentDate()
+        self.fecha_desde.setDate(hoy)
+        self.fecha_hasta.setDate(hoy)
+        self._consultar()
+
+    def _set_periodo_mes_actual(self):
+        hoy = QDate.currentDate()
+        primero_del_mes = QDate(hoy.year(), hoy.month(), 1)
+        self.fecha_desde.setDate(primero_del_mes)
+        self.fecha_hasta.setDate(hoy)
+        self._consultar()
+
+    def _set_periodo_mes_pasado(self):
+        hoy = QDate.currentDate()
+        primero_mes_actual = QDate(hoy.year(), hoy.month(), 1)
+        ultimo_mes_pasado = primero_mes_actual.addDays(-1)
+        primero_mes_pasado = QDate(ultimo_mes_pasado.year(), ultimo_mes_pasado.month(), 1)
+        self.fecha_desde.setDate(primero_mes_pasado)
+        self.fecha_hasta.setDate(ultimo_mes_pasado)
+        self._consultar()
+
     def _consultar(self):
         desde = self.fecha_desde.date().toString("yyyy-MM-dd")
         hasta = self.fecha_hasta.date().toString("yyyy-MM-dd")
 
         pedidos = self.module.get_pedidos_periodo(desde, hasta)
         gastos  = self.module.get_gastos_periodo(desde, hasta)
+
+        # guardamos el estado de la última consulta para poder exportarlo a PDF
+        self._ultimo_desde = desde
+        self._ultimo_hasta = hasta
+        self._ultimos_pedidos = pedidos
+        self._ultimo_total_gastos = sum(g["costo"] for g in gastos)
 
         # ==== LISTA TRABAJOS ====
         self._limpiar_layout(self.trabajos_layout)
@@ -205,7 +255,7 @@ class GananciasView(QWidget):
             total_ganancia += p["precio_final"] or 0
 
         # ==== RESUMEN ====
-        total_gastos = sum(g["costo"] for g in gastos)
+        total_gastos = self._ultimo_total_gastos
         ganancia_neta = total_ganancia - total_gastos
 
         self.lbl_gastos.setText(f"Gastos: {_fmt(total_gastos)}")
@@ -234,3 +284,31 @@ class GananciasView(QWidget):
                 f"{row['cantidad']} trabajos · {_fmt(row['total'])}"
             )
             self.top_prod_layout.addWidget(frame)
+
+    # ==== EXPORTAR PDF ====
+    def _exportar_pdf(self):
+        if not hasattr(self, "_ultimos_pedidos"):
+            QMessageBox.warning(self, "Sin datos", "Primero hacé una consulta.")
+            return
+
+        ruta, _ = QFileDialog.getSaveFileName(
+            self, "Guardar reporte", "reporte_ganancias.pdf", "PDF (*.pdf)"
+        )
+        if not ruta:
+            return
+
+        total_ganancia = sum(p["precio_final"] or 0 for p in self._ultimos_pedidos)
+        ganancia_neta = total_ganancia - self._ultimo_total_gastos
+
+        generar_pdf_ganancias(
+            fecha_desde=self._ultimo_desde,
+            fecha_hasta=self._ultimo_hasta,
+            pedidos=self._ultimos_pedidos,
+            total_gastos=self._ultimo_total_gastos,
+            total_ganancia=total_ganancia,
+            ganancia_neta=ganancia_neta,
+            top_proveedores=self.module.get_top_proveedores(3),
+            top_productos=self.module.get_top_productos(3),
+            ruta_salida=ruta,
+        )
+        QMessageBox.information(self, "Listo", "Reporte exportado correctamente.")
