@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QLabel, QListWidget, QListWidgetItem, QStackedWidget, QFrame
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 
 from app.views.clientes_view import ClientesView
 from app.views.pedidos_view import PedidosView
@@ -10,6 +11,7 @@ from app.views.presupuestos_view import PresupuestosView
 from app.views.pagos_view import PagosView
 from app.views.gastos_view import GastosView
 from app.views.ganancias_view import GananciasView
+from app.modules.orden_pedido_pdf import get_base_path
 
 
 class MainWindow(QMainWindow):
@@ -17,6 +19,11 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Intermedios")
+
+        ruta_logo = get_base_path() / "assets" / "logo.png"
+        if ruta_logo.exists():
+            self.setWindowIcon(QIcon(str(ruta_logo)))
+
         self.showMaximized()
 
         self.menu = QListWidget()
