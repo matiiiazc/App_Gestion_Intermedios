@@ -27,7 +27,7 @@ def main():
     # Metadatos de la aplicación
     app.setApplicationName("Intermedios")
 
-    ruta_logo = get_base_path() / "assets" / "logo.png"
+    ruta_logo = get_base_path() / "assets" / "logointer.png"
     if ruta_logo.exists():
         app.setWindowIcon(QIcon(str(ruta_logo)))
 
