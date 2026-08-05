@@ -97,10 +97,16 @@ def generar_pdf_presupuesto(presupuesto, ruta_salida):
     x, y = _px(75, 632)
     c.drawString(x, y, str(get("tipo_trabajo")))
 
-    # Detalle (con el total al final, ya que la plantilla no tiene renglon aparte)
+# Detalle (con el total al final, ya que la plantilla no tiene renglon aparte)
     c.setFont("Helvetica", 12)
     detalle = str(get("descripcion"))
-    lineas = wrap(detalle, width=95) if detalle else []
+    lineas = []
+    if detalle:
+        for parrafo in detalle.splitlines():
+            if parrafo.strip() == "":
+                lineas.append("")
+            else:
+                lineas.extend(wrap(parrafo, width=95))
     x, y = _px(70, 715)
     for linea in lineas[:28]:
         c.drawString(x, y, linea)

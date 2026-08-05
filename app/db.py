@@ -233,9 +233,9 @@ class Database:
         self.conn.commit()
 
     def get_subtotales_saldo_por_estado(self):
-        """Subtotal de saldo (sena - precio_final) agrupado por cada estado de pedido."""
+        """Subtotal de saldo (precio_final - sena) agrupado por cada estado de pedido."""
         return self.conn.execute("""
-            SELECT estado, COALESCE(SUM(sena - precio_final), 0) AS subtotal_saldo
+            SELECT estado, COALESCE(SUM(precio_final - sena), 0) AS subtotal_saldo
             FROM pedidos
             GROUP BY estado
         """).fetchall()
